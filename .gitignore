@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# 環境変数
+.env
+
+# ベクトルDB（大きいファイル）
+vector_db/
+*.bin
+*.index
+
+# PDFファイル（必要に応じて）
+# reference_docs/*.pdf
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# ログ
+*.log
+debug_*.log
+debug_*.txt
+
+# テスト
+.pytest_cache/
+.coverage
+htmlcov/
+
+# データファイル（再生成可能）
+# faq_database.csv
+# pending_qa.csv
+# faq_generation_history.csv
+# pending_faq_approvals.csv
+
+# デバッグ・一時ファイル
+*.tmp
+temp_*
+*_chunks.txt
+search_debug.txt
+nul
+
+# Claude設定（オプション）
+.claude/

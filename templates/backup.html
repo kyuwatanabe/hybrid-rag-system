@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>バックアップ管理 - GFアメリカビザサポートデスク</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #007c39 0%, #45b134 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .back-link {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            transition: background 0.3s;
+            margin-left: 10px;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .section h2 {
+            color: #007c39;
+            margin-bottom: 20px;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .section p {
+            color: #666;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .btn-primary {
+            background: #007c39;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            background: #005a29;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn-danger:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            background: #c82333;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-label {
+            background: #6c757d;
+            color: white;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .file-label:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+            background: #545b62;
+        }
+
+        .file-name {
+            display: inline-block;
+            margin-left: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #007bff;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            margin-top: 10px;
+        }
+
+        .info-box li {
+            color: #666;
+            line-height: 1.8;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .warning-box p {
+            color: #856404;
+            margin-bottom: 0;
+        }
+
+        .import-options {
+            margin: 20px 0;
+        }
+
+        .import-options label {
+            display: block;
+            margin-bottom: 10px;
+            cursor: pointer;
+            color: #333;
+        }
+
+        .import-options input[type="radio"] {
+            margin-right: 10px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+
+            .section {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>💾 バックアップ管理</h1>
+            <a href="/admin" class="back-link">管理画面に戻る</a>
+        </div>
+
+        <div class="content">
+            <!-- エクスポートセクション -->
+            <div class="section">
+                <h2>📦 バックアップ（エクスポート）</h2>
+
+                <div class="info-box">
+                    <strong>📋 バックアップ内容:</strong>
+                    <ul>
+                        <li>承認済みFAQデータ (faq_data-1.csv)</li>
+                        <li>承認待ちFAQデータ (pending_qa.csv)</li>
+                        <li>不満足フィードバックデータ (unsatisfied_qa.csv)</li>
+                    </ul>
+                </div>
+
+                <p>すべてのデータを含むZIPファイルをダウンロードします。定期的なバックアップを推奨します。</p>
+
+                <a href="/admin/export_all" class="btn-primary">
+                    💾 完全バックアップをダウンロード
+                </a>
+            </div>
+
+            <!-- インポートセクション -->
+            <div class="section">
+                <h2>📥 復元（インポート）</h2>
+
+                <div class="warning-box">
+                    <p><strong>⚠️ 注意:</strong> インポートを実行すると、現在のデータが置き換えられます。必ず事前にバックアップを取ってください。</p>
+                </div>
+
+                <div class="info-box">
+                    <strong>📋 復元される内容:</strong>
+                    <ul>
+                        <li>承認済みFAQ、承認待ちFAQ、不満足フィードバックすべて</li>
+                        <li>確認依頼中のステータスも含む</li>
+                        <li>システムを完全に以前の状態に戻します</li>
+                    </ul>
+                </div>
+
+                <form id="import-form" method="POST" action="/admin/import_all" enctype="multipart/form-data">
+                    <div class="file-input-wrapper">
+                        <input type="file" name="backup_file" id="file-input" accept=".zip" required>
+                        <label for="file-input" class="file-label">
+                            📁 ZIPファイルを選択
+                        </label>
+                        <span class="file-name" id="file-name">ファイルが選択されていません</span>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <button type="submit" class="btn-danger" onclick="return confirm('本当にインポートしますか？現在のデータが置き換えられます。')">
+                            📥 インポート実行
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ファイル名表示
+        document.getElementById('file-input').addEventListener('change', function(e) {
+            const fileName = e.target.files[0]?.name || 'ファイルが選択されていません';
+            document.getElementById('file-name').textContent = fileName;
+        });
+    </script>
+</body>
+</html>

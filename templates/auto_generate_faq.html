@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ自動生成 - GFアメリカビザサポートデスク</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #007c39 0%, #45b134 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        @media (max-width: 768px) {
+            .header {
+                padding: 20px 15px;
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .header h1 {
+                font-size: 20px;
+            }
+        }
+
+        .back-link {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            transition: background 0.3s;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                padding: 20px;
+            }
+        }
+
+        .auto-generate-section {
+            background: #f0f9f5;
+            padding: 30px;
+            border-radius: 10px;
+            border: 2px solid #007c39;
+        }
+
+        .auto-generate-section h2 {
+            color: #007c39;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .info-box {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border-left: 4px solid #007c39;
+        }
+
+        .info-box h3 {
+            color: #007c39;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            color: #555;
+            line-height: 1.8;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+            font-size: 14px;
+        }
+
+        .form-group input[type="file"],
+        .form-group input[type="number"],
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px dashed #007c39;
+            border-radius: 5px;
+            font-size: 14px;
+            background: #f9f9ff;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input[type="number"],
+        .form-group input[type="text"] {
+            border: 1px solid #ddd;
+            border-style: solid;
+            background: white;
+            cursor: text;
+        }
+
+        .form-group input:hover {
+            border-color: #5a6fd8;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #007c39;
+            box-shadow: 0 0 5px rgba(0, 124, 57, 0.3);
+        }
+
+        .file-help {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #007c39 0%, #45b134 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 124, 57, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 768px) {
+            .btn {
+                width: 100%;
+            }
+        }
+
+        .generate-status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+
+        .generate-status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        .generate-status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .generate-status.loading {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>FAQ自動生成</h1>
+            <a href="/admin" class="back-link">管理画面に戻る</a>
+        </div>
+
+        <div class="content">
+            <div class="info-box" style="background: #fff3cd; border-left-color: #ffc107;">
+                <h3>🔧 デバッグモード（リトライ機能付き）</h3>
+                <ul>
+                    <li><strong>第2章.pdfから指定した数のFAQを生成します</strong></li>
+                    <li>重複FAQは除外され、指定数まで自動的に追加生成されます</li>
+                    <li>生成されたFAQは承認待ちキューに追加されます</li>
+                    <li>生成には時間がかかる場合があります（目安: 10件で1〜5分、100件以上は10分以上かかる場合があります）</li>
+                </ul>
+            </div>
+
+            <div class="auto-generate-section">
+                <h2>FAQ 自動生成（デバッグモード）</h2>
+                <p style="margin-bottom: 20px; color: #666;">第2章.pdf からFAQを自動生成します（重複は自動的に除外されます）</p>
+                <form action="/admin/auto_generate" method="post" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="numQuestions">生成するFAQ数:</label>
+                        <select name="num_questions" id="numQuestions" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white;">
+                            <option value="10">10件</option>
+                            <option value="20">20件</option>
+                            <option value="50">50件</option>
+                            <option value="100">100件</option>
+                            <option value="200">200件</option>
+                        </select>
+                    </div>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <button type="submit" class="btn" id="generateBtn">FAQ自動生成を実行（リトライ機能付き）</button>
+                        <button type="button" class="btn" id="interruptBtn" style="background: #dc3545; display: none;">中断</button>
+                    </div>
+                    <div id="timerDisplay" style="margin-top: 10px; font-size: 14px; color: #666; display: none;">
+                        経過時間: <span id="elapsedTime">00:00</span> |
+                        待機時間: <span id="idleTime">--</span>秒 |
+                        生成速度: <span id="generationSpeed">--</span>秒/件
+                    </div>
+                    <div id="retryDisplay" style="margin-top: 5px; font-size: 13px; color: #f57c00; display: none;">
+                        ウィンドウリトライ: <span id="retryCount">0</span>/<span id="maxRetries">10</span>回 |
+                        除外ウィンドウ: <span id="excludedWindows">0</span>/<span id="totalWindows">--</span>個
+                    </div>
+                    <div id="windowRangeDisplay" style="margin-top: 5px; font-size: 13px; color: #0c5460; display: none;">
+                        質問範囲: <span id="questionRange">--</span> |
+                        回答範囲: <span id="answerRange">--</span>
+                    </div>
+                    <div id="generateStatus" class="generate-status"></div>
+                </form>
+
+                <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd;">
+                    <h3 style="color: #666; font-size: 16px; margin-bottom: 10px;">🔧 デバッグツール</h3>
+                    <button type="button" class="btn" id="clearHistoryBtn" style="background: #dc3545;">FAQ生成履歴をクリア</button>
+                    <div id="clearStatus" class="generate-status"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // FAQ自動生成機能（デバッグモード）
+        document.querySelector('form').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const generateBtn = document.getElementById('generateBtn');
+            const interruptBtn = document.getElementById('interruptBtn');
+            const statusDiv = document.getElementById('generateStatus');
+            const timerDisplay = document.getElementById('timerDisplay');
+            const retryDisplay = document.getElementById('retryDisplay');
+            const windowRangeDisplay = document.getElementById('windowRangeDisplay');
+            const elapsedTimeSpan = document.getElementById('elapsedTime');
+            const idleTimeSpan = document.getElementById('idleTime');
+            const generationSpeedSpan = document.getElementById('generationSpeed');
+            const retryCountSpan = document.getElementById('retryCount');
+            const maxRetriesSpan = document.getElementById('maxRetries');
+            const excludedWindowsSpan = document.getElementById('excludedWindows');
+            const totalWindowsSpan = document.getElementById('totalWindows');
+            const questionRangeSpan = document.getElementById('questionRange');
+            const answerRangeSpan = document.getElementById('answerRange');
+
+            // ボタンを無効化してローディング表示
+            const selectedCount = document.getElementById('numQuestions').value;
+            generateBtn.disabled = true;
+            generateBtn.textContent = '生成中...';
+            interruptBtn.style.display = 'inline-block'; // 中断ボタンを表示
+            statusDiv.className = 'generate-status loading';
+            statusDiv.textContent = `FAQ生成中です（第2章.pdfから${selectedCount}件生成）。しばらくお待ちください...`;
+
+            // タイマー開始
+            timerDisplay.style.display = 'block';
+            let startTime = Date.now();
+            let lastGeneratedCount = 0;
+            let lastGeneratedTime = Date.now();
+            let generationTimes = [];  // 直近5件の生成時間を記録
+            let timerInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                const minutes = Math.floor(elapsed / 60);
+                const seconds = elapsed % 60;
+                elapsedTimeSpan.textContent = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            }, 1000);
+
+            // 進捗ポーリング開始
+            let pollingInterval = setInterval(() => {
+                fetch('/admin/generation_progress')
+                    .then(response => response.json())
+                    .then(progress => {
+                        if (progress.status === 'generating') {
+                            const now = Date.now();
+
+                            // ウィンドウ情報を表示（常に表示）
+                            retryDisplay.style.display = 'block';
+                            retryCountSpan.textContent = progress.retry_count || 0;
+                            maxRetriesSpan.textContent = progress.max_retries || 10;
+                            excludedWindowsSpan.textContent = progress.excluded_windows || 0;
+                            totalWindowsSpan.textContent = progress.total_windows || '--';
+
+                            // ウィンドウ範囲情報を表示
+                            if (progress.question_range || progress.answer_range) {
+                                windowRangeDisplay.style.display = 'block';
+                                questionRangeSpan.textContent = progress.question_range || '--';
+                                answerRangeSpan.textContent = progress.answer_range || '--';
+                            } else {
+                                windowRangeDisplay.style.display = 'none';
+                            }
+
+                            // 直近の生成速度を計算（最後の1件にかかった時間）
+                            if (progress.current > lastGeneratedCount) {
+                                const timeDiff = (now - lastGeneratedTime) / 1000;
+
+                                // 直近5件の生成時間を記録
+                                generationTimes.push(timeDiff);
+                                if (generationTimes.length > 5) {
+                                    generationTimes.shift();  // 最も古いデータを削除
+                                }
+
+                                generationSpeedSpan.textContent = timeDiff.toFixed(1);
+                                lastGeneratedTime = now;
+                                lastGeneratedCount = progress.current;
+                            } else if (progress.current === 0) {
+                                generationSpeedSpan.textContent = '--';
+                            }
+
+                            // 待機時間を計算（前のFAQが終わってからの経過時間）
+                            // リトライ中でも常に更新する
+                            if (progress.current > 0 && lastGeneratedTime) {
+                                const idleSeconds = Math.floor((now - lastGeneratedTime) / 1000);
+                                idleTimeSpan.textContent = idleSeconds.toFixed(0);
+                            } else {
+                                idleTimeSpan.textContent = '--';
+                            }
+
+                            // 推定終了時刻を計算（直近5件の平均速度を使用）
+                            // 常に進捗メッセージを更新（リトライ中も含む）
+                            if (progress.current > 0 && generationTimes.length > 0) {
+                                const remaining = progress.total - progress.current;
+                                // 直近5件の平均速度を計算
+                                const avgSpeed = generationTimes.reduce((sum, time) => sum + time, 0) / generationTimes.length;
+                                const estimatedSecondsRemaining = remaining * avgSpeed;
+                                const estimatedEndTime = new Date(Date.now() + estimatedSecondsRemaining * 1000);
+                                const hours = estimatedEndTime.getHours();
+                                const minutes = estimatedEndTime.getMinutes();
+                                const timeString = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+
+                                statusDiv.textContent = `FAQ生成中... 現在${progress.current}/${progress.total}件生成中（推定終了時刻: ${timeString}）`;
+                            } else {
+                                // リトライ中や初期状態でも進捗を表示
+                                statusDiv.textContent = `FAQ生成中... 現在${progress.current}/${progress.total}件生成中`;
+                            }
+                        } else if (progress.status === 'completed') {
+                            clearInterval(pollingInterval);
+                            clearInterval(timerInterval);
+                            const finalTime = elapsedTimeSpan.textContent;
+                            const finalSpeed = generationSpeedSpan.textContent;
+                            statusDiv.className = 'generate-status success';
+                            statusDiv.innerHTML = `<strong>✓ 生成完了！</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQを生成しました。<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
+                            generateBtn.disabled = false;
+                            generateBtn.textContent = 'FAQ自動生成を実行';
+                            interruptBtn.style.display = 'none';
+                        } else if (progress.status === 'interrupted') {
+                            clearInterval(pollingInterval);
+                            clearInterval(timerInterval);
+                            const finalTime = elapsedTimeSpan.textContent;
+                            const finalSpeed = generationSpeedSpan.textContent;
+                            statusDiv.className = 'generate-status error';
+                            statusDiv.innerHTML = `<strong>⚠ 生成が中断されました</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQが生成されました。<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
+                            generateBtn.disabled = false;
+                            generateBtn.textContent = 'FAQ自動生成を実行';
+                            interruptBtn.style.display = 'none';
+                        } else if (progress.status === 'error') {
+                            clearInterval(pollingInterval);
+                            clearInterval(timerInterval);
+                            const finalTime = elapsedTimeSpan.textContent;
+                            statusDiv.className = 'generate-status error';
+                            statusDiv.textContent = `エラー: FAQ生成中にエラーが発生しました（所要時間: ${finalTime}）`;
+                            generateBtn.disabled = false;
+                            generateBtn.textContent = 'FAQ自動生成を実行';
+                            interruptBtn.style.display = 'none';
+                        }
+                    })
+                    .catch(error => {
+                        console.error('進捗取得エラー:', error);
+                        // エラーが発生してもポーリングは継続（サーバーが一時的に応答しない可能性があるため）
+                    });
+            }, 1000); // 1秒ごとにポーリング
+
+            // タイムアウト設定（30分 = 1800秒）
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 1800000);
+
+            fetch('/admin/auto_generate', {
+                method: 'POST',
+                body: formData,
+                signal: controller.signal
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    // バックグラウンド処理開始 - ポーリングは継続する
+                    console.log('FAQ生成開始:', data.message);
+                } else {
+                    // エラー時のみポーリング停止
+                    clearInterval(pollingInterval);
+                    clearInterval(timerInterval);
+                    statusDiv.className = 'generate-status error';
+                    statusDiv.textContent = `エラー: ${data.message}`;
+                    generateBtn.disabled = false;
+                    generateBtn.textContent = 'FAQ自動生成を実行';
+                    interruptBtn.style.display = 'none';
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                clearInterval(pollingInterval); // ポーリング停止
+                clearInterval(timerInterval); // タイマー停止
+                statusDiv.className = 'generate-status error';
+                if (error.name === 'AbortError') {
+                    statusDiv.textContent = 'エラー: FAQの生成に時間がかかりすぎています。サーバーで処理中の可能性があるため、承認待ちFAQ画面で確認してください。';
+                } else {
+                    statusDiv.textContent = `エラー: FAQの生成に失敗しました（${error.message}）`;
+                }
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'FAQ自動生成を実行';
+                interruptBtn.style.display = 'none';
+            });
+        });
+
+        // 中断ボタンのイベントリスナー
+        document.getElementById('interruptBtn').addEventListener('click', function() {
+            if (confirm('FAQ生成を中断しますか？')) {
+                fetch('/admin/interrupt_generation', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('中断リクエスト送信:', data);
+                })
+                .catch(error => {
+                    console.error('中断リクエストエラー:', error);
+                });
+            }
+        });
+
+        // FAQ生成履歴クリア機能
+        document.getElementById('clearHistoryBtn').addEventListener('click', function() {
+            const clearBtn = document.getElementById('clearHistoryBtn');
+            const statusDiv = document.getElementById('clearStatus');
+
+            if (!confirm('FAQ生成履歴を削除しますか？これにより、重複チェックがリセットされます。')) {
+                return;
+            }
+
+            clearBtn.disabled = true;
+            clearBtn.textContent = '削除中...';
+            statusDiv.className = 'generate-status loading';
+            statusDiv.textContent = '履歴を削除しています...';
+
+            fetch('/admin/clear_history', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    statusDiv.className = 'generate-status success';
+                    statusDiv.textContent = data.message;
+                } else {
+                    statusDiv.className = 'generate-status error';
+                    statusDiv.textContent = `エラー: ${data.message}`;
+                }
+            })
+            .catch(error => {
+                statusDiv.className = 'generate-status error';
+                statusDiv.textContent = `エラー: ${error.message}`;
+            })
+            .finally(() => {
+                clearBtn.disabled = false;
+                clearBtn.textContent = 'FAQ生成履歴をクリア';
+            });
+        });
+    </script>
+</body>
+</html>

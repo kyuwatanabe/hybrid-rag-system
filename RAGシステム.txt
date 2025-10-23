@@ -1,0 +1,53 @@
+cd C:\Users\GF001\Desktop\システム開発\手引き用チャットボット\rag_system
+Claude
+直近の作業履歴Eを読んで、現在の状態を確認して
+
+https://railway.com/dashboard
+
+
+
+● RAGシステム開発の始め方
+
+  ?? 準備済みのもの
+
+  すでに以下を準備してあります：
+
+  rag_system/
+  ├── 作業履歴_RAGシステム準備_2025-10-21.md  ← 詳細な手順書
+  ├── README.md                              ← セットアップガイド
+  ├── requirements.txt                       ← 必要なライブラリ
+  ├── .env.sample                           ← 設定例
+  └── (空のディレクトリ構造)
+
+  ?? 開発開始の手順
+
+  1. 作業履歴を読む
+  rag_system/作業履歴_RAGシステム準備_2025-10-21.md
+  - 「次回作業開始時のチェックリスト」セクションに詳細な手順
+
+  2. 環境準備（5-10分）
+  cd rag_system
+  python -m venv venv
+  venv\Scripts\activate
+  pip install -r requirements.txt
+  copy .env.sample .env
+  # .envにClaude APIキーを設定
+
+  3. Phase 1実装（1-2時間）
+  - pdf_processor.py を作成 - PDFからテキスト抽出とチャンク化
+  - vector_store.py を作成 - FAISSベクトルDB構築
+  - テスト実行してベクトルDBを生成
+
+  4. Phase 2以降（順次実装）
+  - Phase 2: 検索システム
+  - Phase 3: 回答生成
+  - Phase 4: Webインターフェース
+  - Phase 5: テストと改善
+
+  ?? 参考ドキュメント
+
+  - 詳細手順: rag_system/作業履歴_RAGシステム準備_2025-10-21.md
+  - 設計資料: RAGシステム開発計画.md（親ディレクトリ）
+  - セットアップ: rag_system/README.md
+
+  次回「RAGシステムの開発を始めたい」と言っていただければ、Phase 1から実装を開始します！

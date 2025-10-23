@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重複チェック - GFアメリカビザサポートデスク</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #007c39 0%, #45b134 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            font-size: 24px;
+        }
+
+        .back-link {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            transition: background 0.3s;
+            margin-left: 10px;
+        }
+
+        .back-link:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .pending-item {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .pending-item h3 {
+            color: #856404;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .qa-question {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .qa-answer {
+            font-size: 14px;
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+
+        .similar-section h3 {
+            color: #dc3545;
+            margin-bottom: 20px;
+            font-size: 18px;
+        }
+
+        .no-similar {
+            text-align: center;
+            padding: 40px;
+            color: #28a745;
+            font-size: 16px;
+        }
+
+        .similar-item {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border-left: 4px solid #dc3545;
+        }
+
+        .similarity-score {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .similar-question {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+
+        .similar-answer {
+            color: #555;
+            font-size: 13px;
+            line-height: 1.5;
+            margin-bottom: 10px;
+        }
+
+        .similar-meta {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            gap: 15px;
+        }
+
+        .similar-meta span {
+            background: #e9ecef;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            text-decoration: none;
+            display: inline-block;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn-approve {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-approve:hover {
+            background: #218838;
+        }
+
+        .btn-reject {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-reject:hover {
+            background: #c82333;
+        }
+
+        .btn-back {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-back:hover {
+            background: #545b62;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>重複チェック</h1>
+            <a href="/admin/review" class="back-link">承認待ち一覧に戻る</a>
+        </div>
+
+        <div class="content">
+            <div class="pending-item">
+                <h3>承認待ちFAQ (ID: {{ pending_item.id }})</h3>
+
+                <div id="view-mode">
+                    <div class="qa-question">{{ pending_item.question }}</div>
+                    <div class="qa-answer">{{ pending_item.answer }}</div>
+                    {% if pending_item.keywords %}
+                    <div style="font-size: 12px; color: #666; margin-top: 10px;">
+                        キーワード: {{ pending_item.keywords }}
+                    </div>
+                    {% endif %}
+                    <div style="font-size: 12px; color: #666; margin-top: 5px;">
+                        カテゴリ: {{ pending_item.category }}
+                    </div>
+                    <button onclick="toggleEditMode()" class="btn" style="background: #ffc107; color: #000; margin-top: 10px;">
+                        ✏️ 編集
+                    </button>
+                </div>
+
+                <div id="edit-mode" style="display: none;">
+                    <form method="POST" action="/admin/edit_pending/{{ pending_item.id }}">
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">質問:</label>
+                            <input type="text" name="question" value="{{ pending_item.question }}"
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">回答:</label>
+                            <textarea name="answer" rows="4"
+                                      style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">{{ pending_item.answer }}</textarea>
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">キーワード:</label>
+                            <input type="text" name="keywords" value="{{ pending_item.keywords }}"
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">カテゴリ:</label>
+                            <input type="text" name="category" value="{{ pending_item.category }}"
+                                   style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        </div>
+                        <button type="submit" class="btn" style="background: #28a745; color: white; margin-right: 10px;">
+                            💾 保存
+                        </button>
+                        <button type="button" onclick="toggleEditMode()" class="btn" style="background: #6c757d; color: white;">
+                            ❌ キャンセル
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="similar-section">
+                {% if similar_faqs %}
+                    <h3>⚠️ 類似するFAQが見つかりました ({{ similar_faqs|length }}件)</h3>
+                    {% for similar in similar_faqs %}
+                    <div class="similar-item">
+                        <div class="similarity-score">類似度: {{ (similar.similarity_score * 100)|round(1) }}%</div>
+                        <div class="similar-question">{{ similar.question }}</div>
+                        <div class="similar-answer">{{ similar.answer[:200] }}{% if similar.answer|length > 200 %}...{% endif %}</div>
+                        <div class="similar-meta">
+                            <span>カテゴリ: {{ similar.category }}</span>
+                            {% if similar.keywords %}
+                            <span>キーワード: {{ similar.keywords }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="no-similar">
+                        <h3>✅ 類似するFAQは見つかりませんでした</h3>
+                        <p>このFAQは新規追加しても重複の問題はありません。</p>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="action-buttons">
+                {% if similar_faqs %}
+                    <p style="color: #dc3545; text-align: center; width: 100%; margin-bottom: 20px;">
+                        類似するFAQがあります。確認してから承認してください。
+                    </p>
+                {% endif %}
+
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <form method="POST" action="/admin/approve/{{ pending_item.id }}" style="margin: 0;">
+                        <button type="submit" class="btn btn-approve"
+                                onclick="return confirm('{% if similar_faqs %}類似するFAQがありますが、{% endif %}このFAQをFAQに追加しますか？')">
+                            承認
+                        </button>
+                    </form>
+
+                    <form method="POST" action="/admin/toggle_confirmation_request/{{ pending_item.id }}" style="margin: 0;">
+                        {% if pending_item.confirmation_request == '1' %}
+                        <button type="submit" class="btn" style="background: #6c757d; color: white;">
+                            確認依頼を解除
+                        </button>
+                        {% else %}
+                        <button type="submit" class="btn" style="background: #ffc107; color: #000;">
+                            確認依頼
+                        </button>
+                        {% endif %}
+                    </form>
+
+                    <form method="POST" action="/admin/reject/{{ pending_item.id }}" style="margin: 0;">
+                        <button type="submit" class="btn btn-reject"
+                                onclick="return confirm('このFAQを却下しますか？')">
+                            却下
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleEditMode() {
+            const viewMode = document.getElementById('view-mode');
+            const editMode = document.getElementById('edit-mode');
+
+            if (viewMode.style.display === 'none') {
+                viewMode.style.display = 'block';
+                editMode.style.display = 'none';
+            } else {
+                viewMode.style.display = 'none';
+                editMode.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

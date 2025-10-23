@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GFアメリカビザサポートデスク</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* スマホ対応 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+        }
+
+        .container {
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #007c39 0%, #45b134 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+            line-height: 1.3;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        /* スマホ対応 - ヘッダー */
+        @media (max-width: 768px) {
+            .header {
+                padding: 20px 15px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+                margin-bottom: 8px;
+            }
+
+            .header p {
+                font-size: 14px;
+            }
+        }
+
+        .chat-container {
+            padding: 30px;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        /* スマホ対応 - チャット */
+        @media (max-width: 768px) {
+            .chat-container {
+                padding: 15px;
+                max-height: 400px;
+            }
+        }
+
+        .chat-messages {
+            margin-bottom: 20px;
+        }
+
+        .message {
+            margin-bottom: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 80%;
+            word-wrap: break-word;
+            word-break: break-word;
+        }
+
+        .user-message {
+            background: #f0f8ff;
+            margin-left: auto;
+            border: 1px solid #007c39;
+        }
+
+        .bot-message {
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+        }
+
+        /* スマホ対応 - メッセージ */
+        @media (max-width: 768px) {
+            .message {
+                max-width: 95%;
+                padding: 12px;
+                margin-bottom: 15px;
+                font-size: 14px;
+            }
+        }
+
+        .confirmation-box {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+        }
+
+        .confirmation-buttons {
+            margin-top: 10px;
+        }
+
+        .confirmation-buttons button {
+            background: #007c39;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+
+        .confirmation-buttons button:hover {
+            background: #006529;
+        }
+
+        .input-container {
+            display: flex;
+            gap: 10px;
+            padding: 20px 30px;
+            border-top: 1px solid #eee;
+        }
+
+        /* スマホ対応 - 入力欄 */
+        @media (max-width: 768px) {
+            .input-container {
+                padding: 15px;
+                gap: 8px;
+            }
+        }
+
+        #questionInput {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #questionInput:focus {
+            border-color: #007c39;
+        }
+
+        #askButton {
+            background: linear-gradient(135deg, #007c39 0%, #45b134 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.3s;
+            white-space: nowrap;
+        }
+
+        /* スマホ対応 - 入力フォーム */
+        @media (max-width: 768px) {
+            #questionInput {
+                padding: 10px 15px;
+                font-size: 16px; /* iOS Safari でズームを防ぐため16px以上 */
+                border-radius: 20px;
+            }
+
+            #askButton {
+                padding: 10px 16px;
+                font-size: 14px;
+                border-radius: 20px;
+                min-width: 70px;
+            }
+        }
+
+        #askButton:hover {
+            transform: translateY(-2px);
+        }
+
+        #askButton:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .admin-link {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            color: #007c39;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s;
+            z-index: 1000;
+        }
+
+        /* スマホ対応 - 管理リンク */
+        @media (max-width: 768px) {
+            .admin-link {
+                top: 10px;
+                right: 10px;
+                padding: 8px 15px;
+                font-size: 12px;
+            }
+        }
+
+        .admin-link:hover {
+            transform: translateY(-2px);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #007c39;
+        }
+
+        .feedback-box {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .feedback-buttons {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* スマホ対応 - フィードバックボタン */
+        @media (max-width: 768px) {
+            .feedback-buttons {
+                flex-direction: column;
+                gap: 8px;
+            }
+
+            .feedback-btn {
+                font-size: 12px;
+                padding: 8px 12px;
+            }
+
+            .confirmation-box {
+                padding: 12px;
+                font-size: 14px;
+            }
+
+            .confirmation-buttons button {
+                padding: 8px 12px;
+                font-size: 13px;
+            }
+        }
+
+        .feedback-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: transform 0.3s;
+        }
+
+        .feedback-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .satisfied {
+            background: #28a745;
+            color: white;
+        }
+
+        .unsatisfied {
+            background: #dc3545;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <a href="/admin" class="admin-link">管理画面</a>
+
+    <div class="container">
+        <div class="header">
+            <h1>GFアメリカビザサポートデスク</h1>
+            <p>アメリカビザに関するご質問にお答えします</p>
+        </div>
+
+        <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot-message">
+                    <strong>アシスタント:</strong> こんにちは！アメリカビザに関するご質問をどうぞ。ただし、どのビザがいいかといったコンサルテーションはできないので、予めご了承ください。
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                回答を検索しています...
+            </div>
+        </div>
+
+        <div class="input-container">
+            <input type="text" id="questionInput" placeholder="質問を入力してください..." maxlength="200">
+            <button id="askButton" onclick="askQuestion()">質問する</button>
+        </div>
+    </div>
+
+    <script>
+        let currentQuestion = '';
+        let currentMatchedQuestion = '';
+        let currentMatchedAnswer = '';
+
+        function askQuestion() {
+            const input = document.getElementById('questionInput');
+            const question = input.value.trim();
+
+            if (!question) {
+                alert('質問を入力してください');
+                return;
+            }
+
+            // ユーザーメッセージを表示
+            addMessage(question, 'user');
+            currentQuestion = question;
+            input.value = '';
+
+            // ローディング表示
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('askButton').disabled = true;
+
+            // API呼び出し
+            fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({question: question})
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('askButton').disabled = false;
+
+                if (data.needs_confirmation) {
+                    currentMatchedQuestion = data.matched_question;
+                    currentMatchedAnswer = data.answer;
+                    showConfirmation(data.suggested_question, data.answer);
+                } else {
+                    currentMatchedQuestion = null;
+                    currentMatchedAnswer = data.answer;
+                    addMessage(data.answer, 'bot');
+                    showFeedbackButtons();
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('askButton').disabled = false;
+                addMessage('申し訳ございません。エラーが発生しました。', 'bot');
+            });
+        }
+
+        function addMessage(content, type) {
+            const chatMessages = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+
+            const sender = type === 'user' ? 'あなた' : 'アシスタント';
+            messageDiv.innerHTML = `<strong>${sender}:</strong> ${content}`;
+
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showConfirmation(suggestedQuestion, answer) {
+            const chatMessages = document.getElementById('chatMessages');
+            const confirmationDiv = document.createElement('div');
+            confirmationDiv.className = 'confirmation-box';
+            confirmationDiv.innerHTML = `
+                <p><strong>ご質問は「${suggestedQuestion}」ということでしょうか？</strong></p>
+                <div class="confirmation-buttons">
+                    <button onclick="confirmYes('${answer.replace(/'/g, "\\'")}')">はい</button>
+                    <button onclick="confirmNo()">いいえ</button>
+                </div>
+            `;
+
+            chatMessages.appendChild(confirmationDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function confirmYes(answer) {
+            // 確認ボックスを削除
+            const confirmationBox = document.querySelector('.confirmation-box');
+            if (confirmationBox) {
+                confirmationBox.remove();
+            }
+
+            addMessage(answer, 'bot');
+            showFeedbackButtons();
+        }
+
+        function confirmNo() {
+            // 確認ボックスを削除
+            const confirmationBox = document.querySelector('.confirmation-box');
+            if (confirmationBox) {
+                confirmationBox.remove();
+            }
+
+            // より有用なメッセージとフィードバック機能を提供
+            addMessage('申し訳ございません。ご質問の意図を正しく理解できませんでした。', 'bot');
+            addMessage('以下のいずれかをお試しください：\n・より具体的な言葉で質問を言い換える\n・関連するキーワードを追加する\n・お電話でのお問い合わせ', 'bot');
+
+            // 改善のためのフィードバックボタンも表示
+            showFeedbackButtons();
+        }
+
+        function showFeedbackButtons() {
+            const chatMessages = document.getElementById('chatMessages');
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'feedback-box';
+            feedbackDiv.innerHTML = `
+                <p><strong>この回答は役に立ちましたか？</strong></p>
+                <div class="feedback-buttons">
+                    <button onclick="sendFeedback(true)" class="feedback-btn satisfied">👍 はい、役に立ちました</button>
+                    <button onclick="sendFeedback(false)" class="feedback-btn unsatisfied">👎 いいえ、役に立ちませんでした</button>
+                </div>
+            `;
+
+            chatMessages.appendChild(feedbackDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function sendFeedback(satisfied) {
+            // フィードバックボックスを削除
+            const feedbackBox = document.querySelector('.feedback-box');
+            if (feedbackBox) {
+                feedbackBox.remove();
+            }
+
+            // フィードバックを送信
+            fetch('/feedback', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    satisfied: satisfied,
+                    user_question: currentQuestion,
+                    matched_question: currentMatchedQuestion,
+                    matched_answer: currentMatchedAnswer
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (satisfied) {
+                    addMessage('フィードバックありがとうございました！', 'bot');
+                } else {
+                    const message = data.message || 'ご指摘ありがとうございます。より良い回答を提供できるよう改善いたします。';
+                    addMessage(message, 'bot');
+                }
+            })
+            .catch(error => {
+                console.error('Feedback error:', error);
+            });
+        }
+
+        // エンターキーで送信
+        document.getElementById('questionInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+    </script>
+</body>
+</html>
