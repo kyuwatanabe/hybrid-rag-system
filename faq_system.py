@@ -1526,7 +1526,7 @@ JSON配列のみを出力してください：
                         else:
                             # 重複なし →  FAQを追加し、ウィンドウの重複カウントをリセット
                             # ウィンドウ情報を追加
-                            faq["window_info"] = f"Q範囲: {window_pair["q_range"]} / A範囲: {window_pair["a_range"]} / 位置: {selected_position}"
+                            faq["window_info"] = f"Q範囲: {window_pair['q_range']} / A範囲: {window_pair['a_range']} / 位置: {selected_position}"
                             all_faqs.append(faq)
                             unique_questions.append(current_question)  # 次回の重複チェック用に追加
                             window_duplicate_count[selected_position] = 0  # リセット
