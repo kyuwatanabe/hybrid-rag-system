@@ -700,13 +700,12 @@ def auto_generate_faqs():
                     for faq in generated_faqs:
                         try:
                             qa_id = faq_system.add_pending_qa(
-                                window_info=faq.get("window_info", "")
-                                question=faq.get('question', ''),
                                 question=faq.get('question', ''),
                                 answer=faq.get('answer', ''),
                                 keywords=faq.get('keywords', ''),
                                 category=faq.get('category', category),
-                                user_question=f"[自動生成] 米国ビザ申請の手引きVer.21..pdfから生成"
+                                user_question=f"[自動生成] 米国ビザ申請の手引きVer.21..pdfから生成",
+                                window_info=faq.get("window_info", "")
                             )
                             added_count += 1
                             print(f"[DEBUG] 承認待ちQ&Aに追加: {qa_id}")
@@ -842,13 +841,12 @@ def auto_generate_faqs():
                     for faq in generated_faqs:
                         try:
                             qa_id = faq_system.add_pending_qa(
-                                window_info=faq.get("window_info", "")
-                                question=faq.get('question', ''),
                                 question=faq.get('question', ''),
                                 answer=faq.get('answer', ''),
                                 keywords=faq.get('keywords', ''),
                                 category=faq.get('category', category),
-                                user_question=f"[自動生成] {uploaded_file.filename}から生成"
+                                user_question=f"[自動生成] {uploaded_file.filename}から生成",
+                                window_info=faq.get("window_info", "")
                             )
                             added_count += 1
                             print(f"[DEBUG] 承認待ちQ&Aに追加: {qa_id}")
