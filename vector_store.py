@@ -90,7 +90,18 @@ class VectorStore:
             path = VECTOR_DB_PATH
 
         if not os.path.exists(path):
-            raise FileNotFoundError(f"Index file not found: {path}")
+            # Try to auto-build if it does not exist
+            print(f"[WARNING] Vector database not found: {path}")
+            print("[INFO] Attempting to auto-build vector database...")
+            try:
+                from startup_init import check_and_build_vector_db
+                if not check_and_build_vector_db():
+                    raise FileNotFoundError(f"Failed to build vector database: {path}")
+                # Retry after building
+                if not os.path.exists(path):
+                    raise FileNotFoundError(f"Vector database still not found after build: {path}")
+            except ImportError:
+                raise FileNotFoundError(f"Index file not found and cannot auto-build: {path}")
 
         print(f"Loading FAISS index from: {path}")
 
