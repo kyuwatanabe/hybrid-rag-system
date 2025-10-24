@@ -521,6 +521,9 @@
 
                         <div class="qa-meta">
                             <span>カテゴリ: {{ item.category }}</span>
+                            {% if item.window_info %}
+                            <span style="color: #666; font-size: 0.9em;">📍 ウィンドウ: {{ item.window_info }}</span>
+                            {% endif %}
                             {% if item.keywords %}
                             <span>キーワード: {{ item.keywords }}</span>
                             {% endif %}

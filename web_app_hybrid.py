@@ -700,6 +700,8 @@ def auto_generate_faqs():
                     for faq in generated_faqs:
                         try:
                             qa_id = faq_system.add_pending_qa(
+                                window_info=faq.get("window_info", "")
+                                question=faq.get('question', ''),
                                 question=faq.get('question', ''),
                                 answer=faq.get('answer', ''),
                                 keywords=faq.get('keywords', ''),
@@ -840,6 +842,8 @@ def auto_generate_faqs():
                     for faq in generated_faqs:
                         try:
                             qa_id = faq_system.add_pending_qa(
+                                window_info=faq.get("window_info", "")
+                                question=faq.get('question', ''),
                                 question=faq.get('question', ''),
                                 answer=faq.get('answer', ''),
                                 keywords=faq.get('keywords', ''),

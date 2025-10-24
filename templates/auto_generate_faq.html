@@ -235,7 +235,7 @@
             <div class="info-box" style="background: #fff3cd; border-left-color: #ffc107;">
                 <h3>🔧 デバッグモード（リトライ機能付き）</h3>
                 <ul>
-                    <li><strong>第2章.pdfから指定した数のFAQを生成します</strong></li>
+                    <li><strong>米国ビザ申請の手引き.pdfから指定した数のFAQを生成します</strong></li>
                     <li>重複FAQは除外され、指定数まで自動的に追加生成されます</li>
                     <li>生成されたFAQは承認待ちキューに追加されます</li>
                     <li>生成には時間がかかる場合があります（目安: 10件で1〜5分、100件以上は10分以上かかる場合があります）</li>
@@ -244,7 +244,7 @@
 
             <div class="auto-generate-section">
                 <h2>FAQ 自動生成（デバッグモード）</h2>
-                <p style="margin-bottom: 20px; color: #666;">第2章.pdf からFAQを自動生成します（重複は自動的に除外されます）</p>
+                <p style="margin-bottom: 20px; color: #666;">米国ビザ申請の手引き.pdf からFAQを自動生成します（重複は自動的に除外されます）</p>
                 <form action="/admin/auto_generate" method="post" enctype="multipart/form-data">
                     <div class="form-group">
                         <label for="numQuestions">生成するFAQ数:</label>
@@ -313,7 +313,7 @@
             generateBtn.textContent = '生成中...';
             interruptBtn.style.display = 'inline-block'; // 中断ボタンを表示
             statusDiv.className = 'generate-status loading';
-            statusDiv.textContent = `FAQ生成中です（第2章.pdfから${selectedCount}件生成）。しばらくお待ちください...`;
+            statusDiv.textContent = `FAQ生成中です（米国ビザ申請の手引き.pdfから${selectedCount}件生成）。しばらくお待ちください...`;
 
             // タイマー開始
             timerDisplay.style.display = 'block';

@@ -96,7 +96,7 @@ class FAQSystem:
         except Exception as e:
             print(f"承認待ちQ&A保存エラー: {e}")
 
-    def add_pending_qa(self, question: str, answer: str, keywords: str = '', category: str = '一般', user_question: str = '') -> str:
+    def add_pending_qa(self, question: str, answer: str, keywords: str = '', category: str = '一般', user_question: str = '', window_info: str = '') -> str:
         """承認待ちQ&Aを追加"""
         import datetime
         import uuid
@@ -112,7 +112,8 @@ class FAQSystem:
             'category': category,
             'created_at': timestamp,
             'user_question': user_question,
-            'confirmation_request': '0'
+            'confirmation_request': '0',
+            'window_info': window_info
         })
 
         self.save_pending_qa()
@@ -1524,6 +1525,8 @@ JSON配列のみを出力してください：
                                 )
                         else:
                             # 重複なし →  FAQを追加し、ウィンドウの重複カウントをリセット
+                            # ウィンドウ情報を追加
+                            faq["window_info"] = f"Q範囲: {window_pair["q_range"]} / A範囲: {window_pair["a_range"]} / 位置: {selected_position}"
                             all_faqs.append(faq)
                             unique_questions.append(current_question)  # 次回の重複チェック用に追加
                             window_duplicate_count[selected_position] = 0  # リセット
