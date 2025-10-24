@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # FAQ system のパスを追加
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'faq_system'))
+# FAQ system is now in the same directory
 from faq_system import FAQSystem, find_similar_faqs
 
 # ハイブリッドRAGシステムをインポート（同じディレクトリにある）
@@ -20,7 +20,7 @@ from hybrid_rag_system import HybridRAGSystem
 app = Flask(__name__)
 
 # 既存のFAQシステム（管理画面用に保持）
-faq_system_dir = os.path.join(os.path.dirname(__file__), '..', 'faq_system')
+faq_system_dir = os.path.dirname(__file__)
 faq_data_path = os.path.join(faq_system_dir, 'faq_data.csv')
 faq_system = FAQSystem(faq_data_path)
 faq_system.claude_api_key = os.getenv('CLAUDE_API_KEY')
