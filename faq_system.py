@@ -511,36 +511,6 @@ class FAQSystem:
             print(f"PDF読み込みエラー {pdf_path}: {e}")
             return ""
 
-    def get_page_positions_from_pdf(self, pdf_path: str) -> dict:
-        """PDFの各ページの開始文字位置を取得"""
-        try:
-            import PyPDF2
-            page_positions = {}  # {page_num: start_char_pos}
-            current_pos = 0
-            with open(pdf_path, 'rb') as file:
-                reader = PyPDF2.PdfReader(file)
-                for page_num, page in enumerate(reader.pages, 1):
-                    page_text = page.extract_text() + "\n"
-                    page_positions[page_num] = {
-                        'start': current_pos,
-                        'end': current_pos + len(page_text),
-                        'length': len(page_text)
-                    }
-                    current_pos += len(page_text)
-            return page_positions
-        except Exception as e:
-            print(f"[ERROR] ページ位置取得エラー: {e}")
-            return {}
-
-    def get_pages_in_range(self, char_start: int, char_end: int, page_positions: dict) -> list:
-        """文字位置範囲に含まれるページ番号のリストを取得"""
-        pages = []
-        for page_num, pos_info in page_positions.items():
-            # ページ範囲とウィンドウ範囲が重なっているかチェック
-            if not (char_end < pos_info['start'] or char_start > pos_info['end']):
-                pages.append(page_num)
-        return sorted(pages)
-
     def load_reference_documents(self) -> str:
         """参考資料を読み込む（PDF、TXT対応）"""
         try:
@@ -1231,10 +1201,6 @@ JSON配列のみを出力してください：
 
             print(f"[DEBUG] PDF全体の文字数: {len(pdf_content)}")
 
-            # ページ位置情報を取得
-            page_positions = self.get_page_positions_from_pdf(pdf_path)
-            print(f"[DEBUG] PDFページ数: {len(page_positions)}")
-
             # 2段階ウィンドウ方式でPDFから抽出位置を決定
             import random
             question_window = 500   # 質問用: 狭い範囲（トピック選択用）
@@ -1256,18 +1222,11 @@ JSON配列のみを出力してください：
                 a_start = pos
                 a_end = pos + answer_window
                 answer_text = pdf_content[a_start:a_end]
-
-                # ページ番号リストを取得
-                q_pages = self.get_pages_in_range(q_start, q_end, page_positions)
-                a_pages = self.get_pages_in_range(a_start, a_end, page_positions)
-
                 return {
                     'question_text': question_text,
                     'answer_text': answer_text,
                     'q_range': f"{q_start}~{q_end}",
                     'a_range': f"{a_start}~{a_end}",
-                    'q_pages': q_pages,
-                    'a_pages': a_pages,
                     'position': pos
                 }
 
@@ -1408,16 +1367,14 @@ JSON配列のみを出力してください：
 
                             # 進捗を更新（リトライ情報を表示）
                             if self.progress_callback:
-                                q_pages_str = ', '.join(map(str, window_pair.get('q_pages', [])))
-                                a_pages_str = ', '.join(map(str, window_pair.get('a_pages', [])))
                                 self.progress_callback(
                                     len(all_faqs),
                                     num_questions,
                                     current_window_retry,
                                     len(excluded_windows),
                                     total_windows,
-                                    f"p.{q_pages_str}",
-                                    f"p.{a_pages_str}"
+                                    window_pair['q_range'],
+                                    window_pair['a_range']
                                 )
                             continue
 
@@ -1557,23 +1514,19 @@ JSON配列のみを出力してください：
 
                             # 進捗を更新（リトライ情報を表示）
                             if self.progress_callback:
-                                q_pages_str = ', '.join(map(str, window_pair.get('q_pages', [])))
-                                a_pages_str = ', '.join(map(str, window_pair.get('a_pages', [])))
                                 self.progress_callback(
                                     len(all_faqs),
                                     num_questions,
                                     current_window_retry,
                                     len(excluded_windows),
                                     total_windows,
-                                    f"p.{q_pages_str}",
-                                    f"p.{a_pages_str}"
+                                    window_pair['q_range'],
+                                    window_pair['a_range']
                                 )
                         else:
                             # 重複なし →  FAQを追加し、ウィンドウの重複カウントをリセット
-                            # ウィンドウ情報を追加（ページ番号リストを含む）
-                            q_pages_str = ', '.join(map(str, window_pair.get('q_pages', [])))
-                            a_pages_str = ', '.join(map(str, window_pair.get('a_pages', [])))
-                            faq["window_info"] = f"Qページ: {q_pages_str} / Aページ: {a_pages_str} / 位置: {selected_position}"
+                            # ウィンドウ情報を追加
+                            faq["window_info"] = f"Q範囲: {window_pair['q_range']} / A範囲: {window_pair['a_range']} / 位置: {selected_position}"
                             all_faqs.append(faq)
                             unique_questions.append(current_question)  # 次回の重複チェック用に追加
                             window_duplicate_count[selected_position] = 0  # リセット
@@ -1588,16 +1541,14 @@ JSON配列のみを出力してください：
                             # 進捗を更新（progress_callbackが設定されている場合）
                             if self.progress_callback:
                                 current_window_retry = 0  # 成功したのでリトライカウントは0
-                                q_pages_str = ', '.join(map(str, window_pair.get('q_pages', [])))
-                                a_pages_str = ', '.join(map(str, window_pair.get('a_pages', [])))
                                 self.progress_callback(
                                     len(all_faqs),
                                     num_questions,
                                     current_window_retry,
                                     len(excluded_windows),
                                     total_windows,
-                                    f"p.{q_pages_str}",
-                                    f"p.{a_pages_str}"
+                                    window_pair['q_range'],
+                                    window_pair['a_range']
                                 )
 
                             # FAQ生成成功 → 次のループで新しいウィンドウを選択
