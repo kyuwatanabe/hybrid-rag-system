@@ -15,6 +15,7 @@ ENV/
 vector_db/
 *.bin
 *.index
+# PDF更新検出用メタデータ（vector_db/pdf_metadata.json は vector_db/ で除外される）
 
 # PDFファイル（必要に応じて）
 # reference_docs/*.pdf
