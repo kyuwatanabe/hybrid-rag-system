@@ -21,7 +21,7 @@ app = Flask(__name__)
 
 # 既存のFAQシステム（管理画面用に保持）
 faq_system_dir = os.path.dirname(__file__)
-faq_data_path = os.path.join(faq_system_dir, 'faq_data.csv')
+faq_data_path = os.path.join(faq_system_dir, 'faq_database.csv')
 faq_system = FAQSystem(faq_data_path)
 faq_system.claude_api_key = os.getenv('CLAUDE_API_KEY')
 # FAQSystemの作業ディレクトリを明示的に設定
