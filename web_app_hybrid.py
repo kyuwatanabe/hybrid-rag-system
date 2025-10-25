@@ -21,7 +21,7 @@ app = Flask(__name__)
 
 # 既存のFAQシステム（管理画面用に保持）
 faq_system_dir = os.path.dirname(__file__)
-faq_data_path = os.path.join(faq_system_dir, 'faq_data.csv')  # 承認済みFAQ
+faq_data_path = os.path.join(faq_system_dir, 'faq_database.csv')  # 承認済みFAQ
 faq_system = FAQSystem(faq_data_path)
 faq_system.claude_api_key = os.getenv('CLAUDE_API_KEY')
 # FAQSystemの作業ディレクトリを明示的に設定
@@ -32,7 +32,7 @@ faq_system.faq_generation_history_file = os.path.join(faq_system_dir, 'faq_gener
 # ハイブリッドRAGシステムを初期化（検索用）
 print("[INFO] ハイブリッドRAGシステムを初期化中...")
 hybrid_rag = HybridRAGSystem(
-    faq_csv_path='faq_data.csv',  # 承認済みFAQ（6件）
+    faq_csv_path='faq_database.csv',  # 承認済みFAQ
     faq_threshold=0.85,
     claude_api_key=os.getenv('CLAUDE_API_KEY')
 )
