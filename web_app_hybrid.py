@@ -47,15 +47,16 @@ generation_progress = {
     'max_retries': 10,  # 最大リトライ回数（ウィンドウごと）
     'excluded_windows': 0,  # 除外されたウィンドウ数
     'total_windows': 0,  # 総ウィンドウ数
-    'question_range': '',  # 質問ウィンドウ範囲
-    'answer_range': '',  # 回答ウィンドウ範囲
+    'positions_list': [],  # 成功した位置のリスト（累積）
+    'current_trying_position': '',  # 現在試行中の位置
     'logs': [],  # 最新10件のログメッセージ
     'start_time': None,  # 生成開始時刻
     'last_update_time': None,  # 最終更新時刻
     'elapsed_time': 0,  # 経過時間（秒）
     'generation_speed': 0,  # 生成速度（FAQ/秒）
     'average_speed': 0,  # 平均速度（FAQ/秒）
-    'time_per_faq': 0  # FAQ1件あたりの平均時間（秒）
+    'time_per_faq': 0,  # FAQ1件あたりの平均時間（秒）
+    'generated_faqs_list': []  # 生成されたFAQのリスト（質問と位置）
 }
 
 @app.route('/')
@@ -605,20 +606,21 @@ def auto_generate_faqs():
             generation_progress['max_retries'] = 10  # ウィンドウごとの最大リトライ回数
             generation_progress['excluded_windows'] = 0
             generation_progress['total_windows'] = 0
-            generation_progress['question_range'] = ''
-            generation_progress['answer_range'] = ''
+            generation_progress['positions_list'] = []  # 成功した位置のリスト
+            generation_progress['current_trying_position'] = ''  # 現在試行中の位置
             generation_progress['start_time'] = time.time()  # 生成開始時刻を記録
             generation_progress['last_update_time'] = time.time()
             generation_progress['elapsed_time'] = 0
             generation_progress['generation_speed'] = 0
             generation_progress['average_speed'] = 0
             generation_progress['time_per_faq'] = 0
+            generation_progress['generated_faqs_list'] = []  # 生成されたFAQリストを初期化
 
             # 中断フラグをリセット
             faq_system.generation_interrupted = False
 
             # 進捗更新用コールバックを設定
-            def update_progress(current, total, retry_count=0, excluded_windows=0, total_windows=0, question_range='', answer_range=''):
+            def update_progress(current, total, retry_count=0, excluded_windows=0, total_windows=0, question_range='', answer_range='', current_position=''):
                 current_time = time.time()
                 generation_progress['current'] = current
                 generation_progress['total'] = total
@@ -626,8 +628,14 @@ def auto_generate_faqs():
                 generation_progress['retry_count'] = retry_count
                 generation_progress['excluded_windows'] = excluded_windows
                 generation_progress['total_windows'] = total_windows
-                generation_progress['question_range'] = question_range
-                generation_progress['answer_range'] = answer_range
+
+                # 現在試行中の位置を常に記録（リアルタイム表示用）
+                generation_progress['current_trying_position'] = current_position
+
+                # FAQ生成成功時（retry_count == 0）のみ位置をリストに追加
+                if retry_count == 0 and current_position and current_position not in generation_progress['positions_list']:
+                    generation_progress['positions_list'].append(current_position)
+
                 generation_progress['last_update_time'] = current_time
 
                 # 経過時間を計算
@@ -639,7 +647,7 @@ def auto_generate_faqs():
                         generation_progress['average_speed'] = current / generation_progress['elapsed_time']
                         generation_progress['time_per_faq'] = generation_progress['elapsed_time'] / current
 
-                print(f"[DEBUG] 進捗更新: {current}/{total}, 経過時間: {generation_progress['elapsed_time']:.1f}秒, 平均速度: {generation_progress['average_speed']:.2f} FAQ/秒, ウィンドウリトライ: {retry_count}, 除外ウィンドウ: {excluded_windows}/{total_windows}, 質問範囲: {question_range}")
+                print(f"[DEBUG] 進捗更新: {current}/{total}, 経過時間: {generation_progress['elapsed_time']:.1f}秒, 平均速度: {generation_progress['average_speed']:.2f} FAQ/秒, ウィンドウリトライ: {retry_count}, 除外ウィンドウ: {excluded_windows}/{total_windows}, 位置リスト: {', '.join(generation_progress['positions_list'])}, 試行中: {current_position}")
 
             faq_system.progress_callback = update_progress
 
@@ -697,6 +705,8 @@ def auto_generate_faqs():
                     # 生成されたFAQを承認待ちキューに追加（中断されても実行）
                     added_count = 0
                     total_generated = len(generated_faqs)
+                    faqs_list = []  # 生成されたFAQリスト（質問と位置）
+
                     for faq in generated_faqs:
                         try:
                             qa_id = faq_system.add_pending_qa(
@@ -709,9 +719,26 @@ def auto_generate_faqs():
                             )
                             added_count += 1
                             print(f"[DEBUG] 承認待ちQ&Aに追加: {qa_id}")
+
+                            # 質問と位置情報を抽出してリストに追加
+                            window_info = faq.get("window_info", "")
+                            position = ""
+                            if window_info:
+                                # window_info形式: "Q範囲: 1250~1750 / A範囲: 1000~2500 / 位置: 1000"
+                                import re
+                                match = re.search(r'位置:\s*(\d+)', window_info)
+                                if match:
+                                    position = match.group(1)
+
+                            faqs_list.append({
+                                'question': faq.get('question', ''),
+                                'position': position
+                            })
                         except Exception as e:
                             print(f"[DEBUG] 承認待ちQ&A追加エラー: {e}")
 
+                    # 生成されたFAQリストをgeneration_progressに保存
+                    generation_progress['generated_faqs_list'] = faqs_list
                     print(f"[DEBUG] {added_count}件のFAQを承認待ちキューに追加しました")
 
                 except Exception as e:
@@ -784,7 +811,7 @@ def auto_generate_faqs():
             faq_system.generation_interrupted = False
 
             # 進捗更新用コールバックを設定
-            def update_progress(current, total, retry_count=0, excluded_windows=0, total_windows=0, question_range='', answer_range=''):
+            def update_progress(current, total, retry_count=0, excluded_windows=0, total_windows=0, question_range='', answer_range='', current_position=''):
                 current_time = time.time()
                 generation_progress['current'] = current
                 generation_progress['total'] = total
@@ -792,8 +819,14 @@ def auto_generate_faqs():
                 generation_progress['retry_count'] = retry_count
                 generation_progress['excluded_windows'] = excluded_windows
                 generation_progress['total_windows'] = total_windows
-                generation_progress['question_range'] = question_range
-                generation_progress['answer_range'] = answer_range
+
+                # 現在試行中の位置を常に記録（リアルタイム表示用）
+                generation_progress['current_trying_position'] = current_position
+
+                # FAQ生成成功時（retry_count == 0）のみ位置をリストに追加
+                if retry_count == 0 and current_position and current_position not in generation_progress['positions_list']:
+                    generation_progress['positions_list'].append(current_position)
+
                 generation_progress['last_update_time'] = current_time
 
                 # 経過時間を計算
@@ -805,7 +838,7 @@ def auto_generate_faqs():
                         generation_progress['average_speed'] = current / generation_progress['elapsed_time']
                         generation_progress['time_per_faq'] = generation_progress['elapsed_time'] / current
 
-                print(f"[DEBUG] 進捗更新: {current}/{total}, 経過時間: {generation_progress['elapsed_time']:.1f}秒, 平均速度: {generation_progress['average_speed']:.2f} FAQ/秒, ウィンドウリトライ: {retry_count}, 除外ウィンドウ: {excluded_windows}/{total_windows}, 質問範囲: {question_range}")
+                print(f"[DEBUG] 進捗更新: {current}/{total}, 経過時間: {generation_progress['elapsed_time']:.1f}秒, 平均速度: {generation_progress['average_speed']:.2f} FAQ/秒, ウィンドウリトライ: {retry_count}, 除外ウィンドウ: {excluded_windows}/{total_windows}, 位置リスト: {', '.join(generation_progress['positions_list'])}, 試行中: {current_position}")
 
             faq_system.progress_callback = update_progress
 

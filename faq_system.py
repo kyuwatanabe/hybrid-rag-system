@@ -1373,8 +1373,9 @@ JSON配列のみを出力してください：
                                     current_window_retry,
                                     len(excluded_windows),
                                     total_windows,
-                                    window_pair['q_range'],
-                                    window_pair['a_range']
+                                    '',  # question_range (使用しない)
+                                    '',  # answer_range (使用しない)
+                                    str(selected_position)  # current_position
                                 )
                             continue
 
@@ -1520,8 +1521,9 @@ JSON配列のみを出力してください：
                                     current_window_retry,
                                     len(excluded_windows),
                                     total_windows,
-                                    window_pair['q_range'],
-                                    window_pair['a_range']
+                                    '',  # question_range (使用しない)
+                                    '',  # answer_range (使用しない)
+                                    str(selected_position)  # current_position
                                 )
                         else:
                             # 重複なし →  FAQを追加し、ウィンドウの重複カウントをリセット

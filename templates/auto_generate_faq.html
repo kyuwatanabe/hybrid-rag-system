@@ -270,8 +270,7 @@
                         除外ウィンドウ: <span id="excludedWindows">0</span>/<span id="totalWindows">--</span>個
                     </div>
                     <div id="windowRangeDisplay" style="margin-top: 5px; font-size: 13px; color: #0c5460; display: none;">
-                        質問範囲: <span id="questionRange">--</span> |
-                        回答範囲: <span id="answerRange">--</span>
+                        位置: <span id="currentPosition">--</span>
                     </div>
                     <div id="generateStatus" class="generate-status"></div>
                 </form>
@@ -304,8 +303,7 @@
             const maxRetriesSpan = document.getElementById('maxRetries');
             const excludedWindowsSpan = document.getElementById('excludedWindows');
             const totalWindowsSpan = document.getElementById('totalWindows');
-            const questionRangeSpan = document.getElementById('questionRange');
-            const answerRangeSpan = document.getElementById('answerRange');
+            const currentPositionSpan = document.getElementById('currentPosition');
 
             // ボタンを無効化してローディング表示
             const selectedCount = document.getElementById('numQuestions').value;
@@ -343,11 +341,19 @@
                             excludedWindowsSpan.textContent = progress.excluded_windows || 0;
                             totalWindowsSpan.textContent = progress.total_windows || '--';
 
-                            // ウィンドウ範囲情報を表示
-                            if (progress.question_range || progress.answer_range) {
+                            // 位置情報を表示（累積 + 現在試行中）
+                            let allPositions = [];
+                            if (progress.positions_list && progress.positions_list.length > 0) {
+                                allPositions = [...progress.positions_list];
+                            }
+                            // 現在試行中の位置を追加（重複チェック）
+                            if (progress.current_trying_position && !allPositions.includes(progress.current_trying_position)) {
+                                allPositions.push(progress.current_trying_position);
+                            }
+
+                            if (allPositions.length > 0) {
                                 windowRangeDisplay.style.display = 'block';
-                                questionRangeSpan.textContent = progress.question_range || '--';
-                                answerRangeSpan.textContent = progress.answer_range || '--';
+                                currentPositionSpan.textContent = allPositions.join(', ');
                             } else {
                                 windowRangeDisplay.style.display = 'none';
                             }
@@ -401,7 +407,15 @@
                             const finalTime = elapsedTimeSpan.textContent;
                             const finalSpeed = generationSpeedSpan.textContent;
                             statusDiv.className = 'generate-status success';
-                            statusDiv.innerHTML = `<strong>✓ 生成完了！</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQを生成しました。<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
+
+                            // 位置のみを表示
+                            let positionsHtml = '';
+                            if (progress.positions_list && progress.positions_list.length > 0) {
+                                const positionsText = progress.positions_list.join(', ');
+                                positionsHtml = `<div style="margin-top: 15px; text-align: left; background: #f9f9f9; padding: 15px; border-radius: 5px;"><strong>使用した位置:</strong> ${positionsText}</div>`;
+                            }
+
+                            statusDiv.innerHTML = `<strong>✓ 生成完了！</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQを生成しました。${positionsHtml}<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
                             generateBtn.disabled = false;
                             generateBtn.textContent = 'FAQ自動生成を実行';
                             interruptBtn.style.display = 'none';
@@ -411,7 +425,15 @@
                             const finalTime = elapsedTimeSpan.textContent;
                             const finalSpeed = generationSpeedSpan.textContent;
                             statusDiv.className = 'generate-status error';
-                            statusDiv.innerHTML = `<strong>⚠ 生成が中断されました</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQが生成されました。<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
+
+                            // 位置のみを表示（中断時も）
+                            let positionsHtml = '';
+                            if (progress.positions_list && progress.positions_list.length > 0) {
+                                const positionsText = progress.positions_list.join(', ');
+                                positionsHtml = `<div style="margin-top: 15px; text-align: left; background: #f9f9f9; padding: 15px; border-radius: 5px;"><strong>使用した位置:</strong> ${positionsText}</div>`;
+                            }
+
+                            statusDiv.innerHTML = `<strong>⚠ 生成が中断されました</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQが生成されました。${positionsHtml}<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
                             generateBtn.disabled = false;
                             generateBtn.textContent = 'FAQ自動生成を実行';
                             interruptBtn.style.display = 'none';
