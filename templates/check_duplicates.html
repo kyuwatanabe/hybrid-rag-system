@@ -294,9 +294,8 @@
                 {% endif %}
 
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                    <form method="POST" action="/admin/approve/{{ pending_item.id }}" style="margin: 0;">
-                        <button type="submit" class="btn btn-approve"
-                                onclick="return confirm('{% if similar_faqs %}類似するFAQがありますが、{% endif %}このFAQをFAQに追加しますか？')">
+                    <form method="POST" action="/admin/approve/{{ pending_item.id }}" style="margin: 0;" onsubmit="return handleApprove(event)">
+                        <button type="submit" class="btn btn-approve" id="approve-btn">
                             承認
                         </button>
                     </form>
@@ -336,6 +335,35 @@
                 viewMode.style.display = 'none';
                 editMode.style.display = 'block';
             }
+        }
+
+        function handleApprove(event) {
+            const hasSimilar = {{ 'true' if similar_faqs else 'false' }};
+            const message = hasSimilar
+                ? '類似するFAQがありますが、このFAQをFAQに追加しますか？'
+                : 'このFAQをFAQに追加しますか？';
+
+            if (!confirm(message)) {
+                event.preventDefault();
+                return false;
+            }
+
+            // ボタンを無効化して処理中表示
+            const btn = document.getElementById('approve-btn');
+            btn.disabled = true;
+            btn.textContent = '処理中...';
+            btn.style.background = '#6c757d';
+
+            // オーバーレイを表示
+            const overlay = document.createElement('div');
+            overlay.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; display: flex; justify-content: center; align-items: center;';
+            const message_div = document.createElement('div');
+            message_div.style.cssText = 'background: white; padding: 30px; border-radius: 10px; text-align: center;';
+            message_div.innerHTML = '<h3>処理中...</h3><p>FAQを承認しています。しばらくお待ちください。</p><p style="color: #666; font-size: 12px; margin-top: 10px;">（約20秒かかります）</p>';
+            overlay.appendChild(message_div);
+            document.body.appendChild(overlay);
+
+            return true;
         }
     </script>
 </body>

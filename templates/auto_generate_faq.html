@@ -232,16 +232,6 @@
         </div>
 
         <div class="content">
-            <div class="info-box" style="background: #fff3cd; border-left-color: #ffc107;">
-                <h3>🔧 デバッグモード（リトライ機能付き）</h3>
-                <ul>
-                    <li><strong>米国ビザ申請の手引き.pdfから指定した数のFAQを生成します</strong></li>
-                    <li>重複FAQは除外され、指定数まで自動的に追加生成されます</li>
-                    <li>生成されたFAQは承認待ちキューに追加されます</li>
-                    <li>生成には時間がかかる場合があります（目安: 10件で1〜5分、100件以上は10分以上かかる場合があります）</li>
-                </ul>
-            </div>
-
             <div class="auto-generate-section">
                 <h2>FAQ 自動生成（デバッグモード）</h2>
                 <p style="margin-bottom: 20px; color: #666;">米国ビザ申請の手引き.pdf からFAQを自動生成します（重複は自動的に除外されます）</p>
@@ -249,6 +239,7 @@
                     <div class="form-group">
                         <label for="numQuestions">生成するFAQ数:</label>
                         <select name="num_questions" id="numQuestions" style="width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; background: white;">
+                            <option value="3">3件</option>
                             <option value="10">10件</option>
                             <option value="20">20件</option>
                             <option value="50">50件</option>
@@ -274,12 +265,6 @@
                     </div>
                     <div id="generateStatus" class="generate-status"></div>
                 </form>
-
-                <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #ddd;">
-                    <h3 style="color: #666; font-size: 16px; margin-bottom: 10px;">🔧 デバッグツール</h3>
-                    <button type="button" class="btn" id="clearHistoryBtn" style="background: #dc3545;">FAQ生成履歴をクリア</button>
-                    <div id="clearStatus" class="generate-status"></div>
-                </div>
             </div>
         </div>
     </div>
@@ -341,21 +326,59 @@
                             excludedWindowsSpan.textContent = progress.excluded_windows || 0;
                             totalWindowsSpan.textContent = progress.total_windows || '--';
 
-                            // 位置情報を表示（累積 + 現在試行中）
-                            let allPositions = [];
-                            if (progress.positions_list && progress.positions_list.length > 0) {
-                                allPositions = [...progress.positions_list];
-                            }
-                            // 現在試行中の位置を追加（重複チェック）
-                            if (progress.current_trying_position && !allPositions.includes(progress.current_trying_position)) {
-                                allPositions.push(progress.current_trying_position);
+                            // 位置情報を表示（累積 + 現在試行中、成功=黒、拒否=赤）
+                            windowRangeDisplay.style.display = 'block';
+
+                            // 成功した位置、拒否された位置、現在試行中の位置を取得
+                            const successPositions = progress.positions_list || [];
+                            const rejectedPositions = progress.rejected_positions || [];
+                            const tryingPosition = progress.current_trying_position || '';
+
+                            // === 生成順表示（ソートなし） v2.0 ===
+                            const allPositions = [];
+                            const seen = new Set();
+
+                            // デバッグ: 元データを確認
+                            console.log('[DEBUG] successPositions:', successPositions);
+                            console.log('[DEBUG] rejectedPositions:', rejectedPositions);
+
+                            // 成功位置を追加（生成順）
+                            for (const pos of successPositions) {
+                                if (!seen.has(pos)) {
+                                    allPositions.push(pos);
+                                    seen.add(pos);
+                                }
                             }
 
+                            // 拒否位置を追加（生成順）
+                            for (const pos of rejectedPositions) {
+                                if (!seen.has(pos)) {
+                                    allPositions.push(pos);
+                                    seen.add(pos);
+                                }
+                            }
+
+                            // 現在試行中の位置を追加
+                            if (tryingPosition && !seen.has(tryingPosition)) {
+                                allPositions.push(tryingPosition);
+                                seen.add(tryingPosition);
+                            }
+
+                            console.log('[DEBUG] allPositions (生成順):', allPositions);
+
                             if (allPositions.length > 0) {
-                                windowRangeDisplay.style.display = 'block';
-                                currentPositionSpan.textContent = allPositions.join(', ');
+                                // HTMLを構築（色分け、ソートなし＝生成順）
+                                const positionHTML = allPositions.map(pos => {
+                                    if (rejectedPositions.includes(pos)) {
+                                        return `<span style="color: red;">${pos}</span>`;
+                                    } else {
+                                        return pos;
+                                    }
+                                }).join(', ');
+
+                                currentPositionSpan.innerHTML = positionHTML;
                             } else {
-                                windowRangeDisplay.style.display = 'none';
+                                currentPositionSpan.textContent = '--';
                             }
 
                             // 直近の生成速度を計算（最後の1件にかかった時間）
@@ -408,14 +431,13 @@
                             const finalSpeed = generationSpeedSpan.textContent;
                             statusDiv.className = 'generate-status success';
 
-                            // 位置のみを表示
-                            let positionsHtml = '';
-                            if (progress.positions_list && progress.positions_list.length > 0) {
-                                const positionsText = progress.positions_list.join(', ');
-                                positionsHtml = `<div style="margin-top: 15px; text-align: left; background: #f9f9f9; padding: 15px; border-radius: 5px;"><strong>使用した位置:</strong> ${positionsText}</div>`;
+                            // 完了後も位置表示を保持（重要！）
+                            // 既に表示されている位置情報を維持する
+                            if (windowRangeDisplay.style.display !== 'block') {
+                                windowRangeDisplay.style.display = 'block';
                             }
 
-                            statusDiv.innerHTML = `<strong>✓ 生成完了！</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQを生成しました。${positionsHtml}<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
+                            statusDiv.innerHTML = `<strong>✓ 生成完了！</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQを生成しました。<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
                             generateBtn.disabled = false;
                             generateBtn.textContent = 'FAQ自動生成を実行';
                             interruptBtn.style.display = 'none';
@@ -426,14 +448,7 @@
                             const finalSpeed = generationSpeedSpan.textContent;
                             statusDiv.className = 'generate-status error';
 
-                            // 位置のみを表示（中断時も）
-                            let positionsHtml = '';
-                            if (progress.positions_list && progress.positions_list.length > 0) {
-                                const positionsText = progress.positions_list.join(', ');
-                                positionsHtml = `<div style="margin-top: 15px; text-align: left; background: #f9f9f9; padding: 15px; border-radius: 5px;"><strong>使用した位置:</strong> ${positionsText}</div>`;
-                            }
-
-                            statusDiv.innerHTML = `<strong>⚠ 生成が中断されました</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQが生成されました。${positionsHtml}<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
+                            statusDiv.innerHTML = `<strong>⚠ 生成が中断されました</strong>（所要時間: ${finalTime}、平均速度: ${finalSpeed}秒/件）<br>${progress.current}件のFAQが生成されました。<br><a href="/admin/review" style="color: #007c39; text-decoration: underline; font-weight: bold;">📋 承認待ちFAQを確認する</a>`;
                             generateBtn.disabled = false;
                             generateBtn.textContent = 'FAQ自動生成を実行';
                             interruptBtn.style.display = 'none';
@@ -512,43 +527,6 @@
                     console.error('中断リクエストエラー:', error);
                 });
             }
-        });
-
-        // FAQ生成履歴クリア機能
-        document.getElementById('clearHistoryBtn').addEventListener('click', function() {
-            const clearBtn = document.getElementById('clearHistoryBtn');
-            const statusDiv = document.getElementById('clearStatus');
-
-            if (!confirm('FAQ生成履歴を削除しますか？これにより、重複チェックがリセットされます。')) {
-                return;
-            }
-
-            clearBtn.disabled = true;
-            clearBtn.textContent = '削除中...';
-            statusDiv.className = 'generate-status loading';
-            statusDiv.textContent = '履歴を削除しています...';
-
-            fetch('/admin/clear_history', {
-                method: 'POST'
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    statusDiv.className = 'generate-status success';
-                    statusDiv.textContent = data.message;
-                } else {
-                    statusDiv.className = 'generate-status error';
-                    statusDiv.textContent = `エラー: ${data.message}`;
-                }
-            })
-            .catch(error => {
-                statusDiv.className = 'generate-status error';
-                statusDiv.textContent = `エラー: ${error.message}`;
-            })
-            .finally(() => {
-                clearBtn.disabled = false;
-                clearBtn.textContent = 'FAQ生成履歴をクリア';
-            });
         });
     </script>
 </body>
