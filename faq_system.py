@@ -14,7 +14,6 @@ class FAQSystem:
         self.pending_qa = []
         self.csv_file = csv_file
         self.pending_file = 'pending_qa.csv'
-        self.faq_generation_history_file = 'faq_generation_history.csv'  # デフォルト値
         self.claude_api_key = None  # web_app.pyから設定される
         self.generation_interrupted = False  # 生成中断フラグ
         self.progress_callback = None  # 進捗報告用コールバック
@@ -31,6 +30,10 @@ class FAQSystem:
             print(f"[WARNING] セマンティックモデルのロード失敗: {e}")
             print("[WARNING] 文字列ベースの重複判定にフォールバックします")
             self.semantic_model = None
+
+        # 承認済みFAQの埋め込みベクトルキャッシュ（FAQ生成の質向上用）
+        self.faq_embeddings = None
+        self.faq_embeddings_texts = []  # 各埋め込みに対応するFAQ本文
 
         self.load_faq_data(csv_file)
         self.load_pending_qa()
@@ -71,7 +74,8 @@ class FAQSystem:
                         'created_at': row.get('created_at', ''),
                         'user_question': row.get('user_question', '').strip(),
                         'confirmation_request': row.get('confirmation_request', '0').strip(),
-                        'comment': row.get('comment', '').strip()
+                        'comment': row.get('comment', '').strip(),
+                        'window_info': row.get('window_info', '').strip()
                     })
             print(f"承認待ちQ&Aを{len(self.pending_qa)}件読み込みました")
         except FileNotFoundError:
@@ -85,14 +89,14 @@ class FAQSystem:
         try:
             with open(self.pending_file, 'w', encoding='utf-8-sig', newline='') as file:
                 if self.pending_qa:
-                    fieldnames = ['id', 'question', 'answer', 'keywords', 'category', 'created_at', 'user_question', 'confirmation_request', 'comment']
-                    writer = csv.DictWriter(file, fieldnames=fieldnames)
+                    fieldnames = ['id', 'question', 'answer', 'keywords', 'category', 'created_at', 'user_question', 'confirmation_request', 'comment', 'window_info']
+                    writer = csv.DictWriter(file, fieldnames=fieldnames, extrasaction='ignore')
                     writer.writeheader()
                     writer.writerows(self.pending_qa)
                 else:
                     # 空ファイルでもヘッダーは書く
                     writer = csv.writer(file)
-                    writer.writerow(['id', 'question', 'answer', 'keywords', 'category', 'created_at', 'user_question', 'confirmation_request'])
+                    writer.writerow(['id', 'question', 'answer', 'keywords', 'category', 'created_at', 'user_question', 'confirmation_request', 'comment', 'window_info'])
         except Exception as e:
             print(f"承認待ちQ&A保存エラー: {e}")
 
@@ -361,7 +365,7 @@ class FAQSystem:
     def save_faq_data(self) -> None:
         """FAQデータをCSVファイルに保存"""
         try:
-            with open('faq_data-1.csv', 'w', encoding='utf-8-sig', newline='') as file:
+            with open(self.csv_file, 'w', encoding='utf-8-sig', newline='') as file:
                 writer = csv.DictWriter(file, fieldnames=['question', 'answer', 'keywords', 'category'])
                 writer.writeheader()
                 for faq in self.faq_data:
@@ -443,56 +447,6 @@ class FAQSystem:
             print("不満足なQ&Aを記録しました。")
         except Exception as e:
             print(f"記録エラー: {e}")
-
-    def _load_generation_history(self) -> list:
-        """FAQ生成履歴を読み込む"""
-        history_file = self.faq_generation_history_file
-        history = []
-        try:
-            with open(history_file, 'r', encoding='utf-8-sig') as file:
-                csv_reader = csv.DictReader(file)
-                for row in csv_reader:
-                    history.append({
-                        'question': row.get('question', '').strip(),
-                        'answer': row.get('answer', '').strip(),
-                        'timestamp': row.get('timestamp', '').strip()
-                    })
-            print(f"[DEBUG] FAQ生成履歴を{len(history)}件読み込みました")
-        except FileNotFoundError:
-            print("[DEBUG] FAQ生成履歴ファイルが存在しません（初回生成）")
-        except Exception as e:
-            print(f"[DEBUG] FAQ生成履歴読み込みエラー: {e}")
-        return history
-
-    def _save_to_generation_history(self, faqs: list) -> None:
-        """生成したFAQを履歴に保存"""
-        import datetime
-        import os
-
-        history_file = self.faq_generation_history_file
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-        try:
-            # ファイルが存在するかチェック
-            file_exists = os.path.exists(history_file)
-
-            with open(history_file, 'a', encoding='utf-8-sig', newline='') as file:
-                fieldnames = ['timestamp', 'question', 'answer']
-                writer = csv.DictWriter(file, fieldnames=fieldnames)
-
-                if not file_exists:
-                    writer.writeheader()
-
-                for faq in faqs:
-                    writer.writerow({
-                        'timestamp': timestamp,
-                        'question': faq.get('question', ''),
-                        'answer': faq.get('answer', '')
-                    })
-
-            print(f"[DEBUG] {len(faqs)}件のFAQを生成履歴に保存しました")
-        except Exception as e:
-            print(f"[DEBUG] FAQ生成履歴保存エラー: {e}")
 
     def extract_text_from_pdf(self, pdf_path: str) -> str:
         """PDFからテキストを抽出"""
@@ -759,16 +713,122 @@ class FAQSystem:
                 'category': "その他"
             }
 
+    def _build_faq_embeddings(self):
+        """承認済みFAQをベクトル化してキャッシュする"""
+        if not self.semantic_model or not self.faq_data:
+            return
+
+        try:
+            import numpy as np
+
+            print(f"[INFO] 承認済みFAQ {len(self.faq_data)}件をベクトル化中...")
+
+            # FAQ本文を作成（質問+回答）
+            self.faq_embeddings_texts = []
+            texts_to_encode = []
+
+            for faq in self.faq_data:
+                # 質問と回答を結合してベクトル化
+                combined_text = f"{faq['question']} {faq['answer']}"
+                texts_to_encode.append(combined_text)
+                self.faq_embeddings_texts.append(faq)
+
+            # ベクトル化
+            if texts_to_encode:
+                self.faq_embeddings = self.semantic_model.encode(texts_to_encode, convert_to_tensor=False)
+                print(f"[INFO] FAQベクトル化完了: {len(self.faq_embeddings)}件")
+            else:
+                self.faq_embeddings = None
+
+        except Exception as e:
+            print(f"[WARNING] FAQベクトル化エラー: {e}")
+            self.faq_embeddings = None
+
+    def _find_similar_faqs(self, window_text: str, top_k: int = 5) -> list:
+        """ウィンドウテキストと類似する承認済みFAQを検索"""
+        if not self.semantic_model or not self.faq_data:
+            return []
+
+        try:
+            import numpy as np
+            from sklearn.metrics.pairwise import cosine_similarity
+
+            # FAQベクトルがまだ構築されていなければ構築
+            if self.faq_embeddings is None:
+                self._build_faq_embeddings()
+
+            # FAQベクトルが存在しない場合は空リストを返す
+            if self.faq_embeddings is None or len(self.faq_embeddings) == 0:
+                return []
+
+            # ウィンドウテキストをベクトル化
+            window_embedding = self.semantic_model.encode([window_text], convert_to_tensor=False)
+
+            # コサイン類似度を計算
+            similarities = cosine_similarity(window_embedding, self.faq_embeddings)[0]
+
+            # TOP K のインデックスを取得
+            top_indices = np.argsort(similarities)[::-1][:top_k]
+
+            # 類似FAQを返す（類似度スコア付き）
+            similar_faqs = []
+            for idx in top_indices:
+                if similarities[idx] > 0.3:  # 類似度閾値: 0.3以上のみ
+                    similar_faqs.append({
+                        'question': self.faq_embeddings_texts[idx]['question'],
+                        'answer': self.faq_embeddings_texts[idx]['answer'],
+                        'similarity': float(similarities[idx])
+                    })
+
+            if similar_faqs:
+                print(f"[INFO] 類似FAQ {len(similar_faqs)}件を検索（類似度: {similar_faqs[0]['similarity']:.2f} ~ {similar_faqs[-1]['similarity']:.2f}）")
+
+            return similar_faqs
+
+        except Exception as e:
+            print(f"[WARNING] 類似FAQ検索エラー: {e}")
+            return []
+
     def _generate_qa_from_window(self, window_text: str, category: str, used_questions: list = None, window_rejected_questions: list = None) -> dict:
         """1段階生成: ウィンドウテキストから直接Q&Aを1つ生成"""
         import requests
         import json
         import os
+        import csv
 
         if used_questions is None:
             used_questions = []
         if window_rejected_questions is None:
             window_rejected_questions = []
+
+        # rejected_patterns.csv から不適切な質問パターンを読み込む（type=questionのみ）
+        rejected_patterns = []
+        rejected_file = 'rejected_patterns.csv'
+        try:
+            if os.path.exists(rejected_file):
+                with open(rejected_file, 'r', encoding='utf-8') as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        # type列がない場合は質問として扱う（後方互換性）
+                        row_type = row.get('type', 'question')
+                        if row_type == 'question' and row.get('question'):
+                            rejected_patterns.append(row['question'])
+        except Exception as e:
+            print(f"[DEBUG] rejected_patterns.csv 読み込みエラー: {e}")
+
+        # 類似する承認済みFAQを検索（FAQ生成の質向上のため）
+        similar_faqs = self._find_similar_faqs(window_text, top_k=5)
+
+        # 類似FAQをプロンプトに追加
+        similar_faqs_text = ""
+        if similar_faqs:
+            similar_faqs_text = "\n【参考：類似する承認済みFAQ】\n"
+            similar_faqs_text += "以下は、この文章と関連性の高い承認済みFAQの例です。これらを参考に、同様の質と文脈の明確さで新しいFAQを生成してください。\n\n"
+            for i, faq in enumerate(similar_faqs[:3], 1):  # 最大3件まで表示（トークン節約のため）
+                similar_faqs_text += f"例{i}:\n"
+                similar_faqs_text += f"Q: {faq['question']}\n"
+                similar_faqs_text += f"A: {faq['answer']}\n\n"
+            similar_faqs_text += "**重要**: 上記の例を参考に、質問は状況や文脈が明確になるよう作成してください。\n"
 
         # ウィンドウ固有の却下質問を最優先で表示
         window_rejected_text = ""
@@ -784,6 +844,19 @@ class FAQSystem:
 例：上記が「I-94」「出国記録」なら、「ビザ有効期限」「ESTA申請」など全く別の話題を選ぶこと。
 """
 
+        # 不適切な質問パターン（ユーザーが作り直しを要求したもの）
+        rejected_patterns_text = ""
+        if rejected_patterns:
+            rejected_patterns_text = f"""
+
+【🚫 過去にユーザーが不適切と判断した質問パターン】
+**以下の質問は過去にユーザーが「不適切」として作り直しを要求しました。絶対に同じような質問を作成しないでください**：
+
+{chr(10).join([f'🚫 {i+1}. {q}' for i, q in enumerate(rejected_patterns[-20:])])}
+
+**重要**：上記のような質問の**形式や傾向**を絶対に避けてください。
+"""
+
         used_questions_text = ""
         if used_questions:
             # 最新20個のみ表示（ウィンドウ固有の情報を優先するため減らす）
@@ -797,30 +870,39 @@ class FAQSystem:
 """
 
         prompt = f"""
-あなたは米国ビザFAQ作成の専門家です。以下の1500文字の文章から、**完全に異なる5つの質問**を作成してください。
+あなたは米国ビザFAQ作成の専門家です。以下の1500文字の文章から、**1つの実用的な質問**を作成してください。
 
 【文章（1500文字）】
 {window_text}
-
+{similar_faqs_text}
+{rejected_patterns_text}
 {window_rejected_text}
 
 {used_questions_text}
 
 【重要タスク】
-1. この1500文字の文章には複数の異なるトピックが含まれています
-2. **5つの質問は、それぞれ完全に異なるトピック**から選んでください
-3. **却下された質問のトピックは絶対に避けてください**
-4. 各トピックについて、実用的な質問と回答を作成してください
-
-**多様性の確保が最優先です**：
-- 5つの質問は互いに全く異なるトピックであること
-- 例：「ビザ有効期限」「ESTA申請」「入国審査」「家族同伴」「職業制限」のように、完全に別の話題
+1. この文章から最も実用的なトピックを1つ選んでください
+2. **却下された質問のトピックは絶対に避けてください**
+3. 既存質問と重複しないトピックを選んでください
+4. ビザ申請者が実際に聞きそうな質問を作成してください
 
 【質問作成のルール】
 - **必ず日本語で作成すること**（英語は禁止）
+- **語尾は必ず「です・ます調」で統一すること**（例：〜ですか？、〜ますか？）
 - 35文字以内のシンプルな質問
-- 「はい/いいえ」「何」「いつ」「どこ」「誰」で答えられる質問
+- **ビザ手続き・要件・制度に関する情報を問う質問**（例：「〜は何ですか？」「〜はいつまでですか？」「〜はどこで確認できますか？」）
 - ビザ申請者が実際に聞きそうな実用的な質問
+
+【良い質問の例】
+✓ 「I-94の有効期限はどこで確認できますか？」
+✓「ESTAの申請に必要な書類は何ですか？」
+✓「ビザの面接はどこで行われますか？」
+✓「パスポートの有効期限はいつまで必要ですか？」
+
+【悪い質問の例（絶対禁止）】
+❌「あなたは管理職ですか？」← 申請者の個人的な状況を聞く質問は禁止
+❌「あなたは学生ですか？」← 申請者の個人的な状況を聞く質問は禁止
+❌「あなたは〜ですか？」形式の質問は全て禁止
 
 【回答作成のルール】
 - **必ず日本語で作成すること**（英語は禁止）
@@ -832,30 +914,19 @@ class FAQSystem:
 【絶対禁止】
 ❌ 却下された質問と同じトピックの質問
 ❌ 既存質問リストにある質問と似た質問
-❌ 5つの質問の中で似たトピックを選ぶ
+❌ 申請者の個人的な状況を尋ねる質問（「あなたは〜ですか？」など）
 ❌ 文章にない情報を推測する
 ❌ マニアックすぎる・特殊すぎる質問
 ❌ ナンセンスな質問（当たり前のことを聞く）
 
 【出力形式】
-JSON配列で5つ：
-[
-  {{
-    "question": "質問1（35文字以内）",
-    "answer": "回答1（120文字以内）",
-    "keywords": "キーワード1;キーワード2;キーワード3",
-    "category": "{category}"
-  }},
-  {{
-    "question": "質問2（35文字以内）",
-    "answer": "回答2（120文字以内）",
-    "keywords": "キーワード1;キーワード2;キーワード3",
-    "category": "{category}"
-  }},
-  ... （5つ）
-]
-
-適切な質問が5つ作れない場合は、作れる数だけ返してください（最低1つ）。
+単一のJSONオブジェクト：
+{{
+  "question": "質問（35文字以内）",
+  "answer": "回答（120文字以内）",
+  "keywords": "キーワード1;キーワード2;キーワード3",
+  "category": "{category}"
+}}
 """
 
         try:
@@ -872,7 +943,7 @@ JSON配列で5つ：
 
             data = {
                 'model': 'claude-3-haiku-20240307',
-                'max_tokens': 3072,  # 5つの質問を生成するため増やす
+                'max_tokens': 1024,  # 1つの質問のみ生成
                 'temperature': 1.0,  # 多様性を確保するため最大値に設定
                 'messages': [
                     {
@@ -900,21 +971,21 @@ JSON配列で5つ：
                     content = content.replace("```json", "").replace("```", "").strip()
 
                 import re
-                # 配列を探す（[...] 形式）
-                json_match = re.search(r'\[.*\]', content, re.DOTALL)
-                if json_match:
-                    faq_list = json.loads(json_match.group())
-                    if faq_list and isinstance(faq_list, list) and len(faq_list) > 0:
-                        print(f"[DEBUG] Q&A生成成功: {len(faq_list)}個の質問候補を生成")
-                        return faq_list  # リストを返す
-
-                # 配列が見つからない場合、単一オブジェクトとしてパースを試みる（後方互換性）
+                # 単一オブジェクトを優先してパース（{...} 形式）
                 json_match = re.search(r'\{.*\}', content, re.DOTALL)
                 if json_match:
                     faq_data = json.loads(json_match.group())
                     if faq_data and 'question' in faq_data and faq_data['question']:
                         print(f"[DEBUG] Q&A生成成功（単一）: {faq_data['question'][:50]}...")
                         return [faq_data]  # リストに変換して返す
+
+                # 単一オブジェクトが見つからない場合、配列としてパースを試みる（後方互換性）
+                json_match = re.search(r'\[.*\]', content, re.DOTALL)
+                if json_match:
+                    faq_list = json.loads(json_match.group())
+                    if faq_list and isinstance(faq_list, list) and len(faq_list) > 0:
+                        print(f"[DEBUG] Q&A生成成功（配列）: {len(faq_list)}個の質問候補")
+                        return faq_list  # リストを返す
 
                 print("[DEBUG] JSON形式が不正または空")
                 return []  # 空リストを返す
@@ -1375,7 +1446,8 @@ JSON配列のみを出力してください：
                                     total_windows,
                                     '',  # question_range (使用しない)
                                     '',  # answer_range (使用しない)
-                                    str(selected_position)  # current_position
+                                    str(selected_position),  # current_position
+                                    str(selected_position) if selected_position else ''  # rejected_position (回答不可能なので拒否)
                                 )
                             continue
 
@@ -1523,7 +1595,8 @@ JSON配列のみを出力してください：
                                     total_windows,
                                     '',  # question_range (使用しない)
                                     '',  # answer_range (使用しない)
-                                    str(selected_position)  # current_position
+                                    str(selected_position),  # current_position
+                                    str(selected_position) if selected_position else ''  # rejected_position (重複なので拒否)
                                 )
                         else:
                             # 重複なし →  FAQを追加し、ウィンドウの重複カウントをリセット
@@ -1549,8 +1622,10 @@ JSON配列のみを出力してください：
                                     current_window_retry,
                                     len(excluded_windows),
                                     total_windows,
-                                    window_pair['q_range'],
-                                    window_pair['a_range']
+                                    '',  # question_range (使用しない)
+                                    '',  # answer_range (使用しない)
+                                    str(selected_position),  # current_position
+                                    ''  # rejected_position (成功なので空)
                                 )
 
                             # FAQ生成成功 → 次のループで新しいウィンドウを選択
@@ -1571,9 +1646,6 @@ JSON配列のみを出力してください：
                 print(f"[WARNING] 重複または回答不可能な質問が多かったため、これ以上生成できませんでした。")
                 print(f"[WARNING] 除外されたウィンドウ数: {len(excluded_windows)}個")
 
-            # 生成したFAQを履歴に保存して返す
-            if all_faqs:
-                self._save_to_generation_history(all_faqs)
             return all_faqs
 
         except Exception as e:
@@ -1590,6 +1662,254 @@ JSON配列のみを出力してください：
                 self.last_error_message = f"FAQ生成中にエラーが発生しました: {error_message}"
 
             return []
+
+    def generate_answer_for_question(self, question: str, window_position: int, category: str = "AI生成") -> dict:
+        """指定された質問に対して回答のみを生成（回答作り直し機能用）"""
+        try:
+            import os
+            import glob
+            import requests
+            import json
+
+            # PDFパスを取得
+            pdf_dir = 'reference_docs'
+            pdf_files = glob.glob(os.path.join(pdf_dir, '*.pdf'))
+            if not pdf_files:
+                print(f"[ERROR] PDFファイルが見つかりません: {pdf_dir}")
+                return {'status': 'error', 'reason': 'PDFファイルが見つかりません'}
+
+            pdf_path = pdf_files[0]
+            print(f"[DEBUG] PDF使用: {os.path.basename(pdf_path)}")
+
+            # PDFからテキストを抽出
+            pdf_content = self.extract_text_from_pdf(pdf_path)
+            if not pdf_content:
+                print(f"[ERROR] PDFの読み込みに失敗: {pdf_path}")
+                return {'status': 'error', 'reason': 'PDFの読み込みに失敗'}
+
+            # ウィンドウパラメータ
+            answer_window = 1500
+            pdf_length = len(pdf_content)
+
+            # ウィンドウ位置が範囲内か確認
+            if window_position < 0 or window_position >= pdf_length - answer_window:
+                print(f"[ERROR] ウィンドウ位置が範囲外: {window_position}")
+                return {'status': 'error', 'reason': 'ウィンドウ位置が範囲外'}
+
+            # ウィンドウテキストを抽出
+            a_start = window_position
+            a_end = window_position + answer_window
+            answer_text = pdf_content[a_start:a_end]
+
+            print(f"[DEBUG] 回答生成中（質問: {question[:30]}...）")
+
+            # rejected_patterns.csv から不適切な回答パターンを読み込む
+            rejected_answers = []
+            rejected_file = 'rejected_patterns.csv'
+            import csv
+            try:
+                if os.path.exists(rejected_file):
+                    with open(rejected_file, 'r', encoding='utf-8') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            if row.get('type') == 'answer' and row.get('answer'):
+                                rejected_answers.append(row['answer'])
+            except Exception as e:
+                print(f"[DEBUG] rejected_patterns.csv (answer) 読み込みエラー: {e}")
+
+            # 不適切な回答パターンをプロンプトに追加
+            rejected_answers_text = ""
+            if rejected_answers:
+                rejected_answers_text = f"""
+
+【🚫 過去にユーザーが不適切と判断した回答パターン】
+**以下の回答は過去にユーザーが「不適切」として作り直しを要求しました。絶対に同じような回答を作成しないでください**：
+
+{chr(10).join([f'🚫 {i+1}. {a[:80]}...' for i, a in enumerate(rejected_answers[-10:])])}
+
+**重要**：上記のような回答の**内容や傾向**を絶対に避けてください。
+"""
+
+            # 回答生成プロンプト
+            prompt = f"""
+あなたは米国ビザFAQ作成の専門家です。以下の質問に対して、文章から適切な回答を作成してください。
+
+【質問】
+{question}
+
+【参考文章（1500文字）】
+{answer_text}
+{rejected_answers_text}
+
+【回答作成のルール】
+- **必ず日本語で作成すること**（英語は禁止）
+- **語尾は必ず「です・ます調」で統一すること**（例：〜です、〜ます、〜できます）
+- 120文字以内で簡潔に
+- 文章に書かれている事実のみを使用
+- 推測や補足は含めない
+- 質問に直接答える内容にする
+
+【絶対禁止】
+❌ 過去に不適切と判断された回答と似た回答
+❌ 文章にない情報を推測する
+❌ 質問と関係ない情報を含める
+
+【出力形式】
+単一のJSONオブジェクト：
+{{
+  "answer": "回答（120文字以内）",
+  "keywords": "キーワード1;キーワード2;キーワード3"
+}}
+"""
+
+            # Claude APIで回答を生成
+            api_key = self.claude_api_key or os.getenv('CLAUDE_API_KEY')
+            if not api_key:
+                print("[ERROR] CLAUDE_API_KEY未設定")
+                return {'status': 'error', 'reason': 'CLAUDE_API_KEY未設定'}
+
+            headers = {
+                'Content-Type': 'application/json',
+                'x-api-key': api_key,
+                'anthropic-version': '2023-06-01'
+            }
+
+            data = {
+                'model': 'claude-3-haiku-20240307',
+                'max_tokens': 512,
+                'temperature': 0.7,
+                'messages': [
+                    {
+                        'role': 'user',
+                        'content': prompt
+                    }
+                ]
+            }
+
+            json_data = json.dumps(data, ensure_ascii=False)
+
+            response = requests.post(
+                'https://api.anthropic.com/v1/messages',
+                headers=headers,
+                data=json_data.encode('utf-8'),
+                timeout=30
+            )
+
+            if response.status_code == 200:
+                result = response.json()
+                content = result['content'][0]['text'].strip()
+
+                # JSONをパース
+                if content.startswith("```json"):
+                    content = content.replace("```json", "").replace("```", "").strip()
+                elif content.startswith("```"):
+                    content = content.replace("```", "").strip()
+
+                parsed = json.loads(content)
+
+                print(f"[DEBUG] 新しい回答生成成功")
+                return {
+                    'status': 'success',
+                    'answer': parsed.get('answer', ''),
+                    'keywords': parsed.get('keywords', '')
+                }
+            else:
+                print(f"[ERROR] Claude API エラー: {response.status_code}")
+                print(f"[ERROR] レスポンス: {response.text}")
+                return {'status': 'error', 'reason': f'Claude API エラー: {response.status_code}'}
+
+        except Exception as e:
+            print(f"[ERROR] generate_answer_for_question エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'status': 'error', 'reason': str(e)}
+
+    def generate_faq_for_window(self, window_position: int, category: str = "AI生成") -> dict:
+        """指定されたウィンドウ位置でFAQを1つ生成（作り直し機能用）"""
+        try:
+            import os
+            import glob
+
+            # PDFパスを取得（reference_docs/ から最初のPDFを探す）
+            pdf_dir = 'reference_docs'
+            pdf_files = glob.glob(os.path.join(pdf_dir, '*.pdf'))
+            if not pdf_files:
+                print(f"[ERROR] PDFファイルが見つかりません: {pdf_dir}")
+                return {'status': 'error', 'reason': 'PDFファイルが見つかりません'}
+
+            pdf_path = pdf_files[0]  # 最初のPDFを使用
+            print(f"[DEBUG] PDF使用: {os.path.basename(pdf_path)}")
+
+            # PDFからテキストを抽出
+            pdf_content = self.extract_text_from_pdf(pdf_path)
+            if not pdf_content:
+                print(f"[ERROR] PDFの読み込みに失敗: {pdf_path}")
+                return {'status': 'error', 'reason': 'PDFの読み込みに失敗'}
+
+            # ウィンドウパラメータ
+            question_window = 500
+            answer_window = 1500
+            pdf_length = len(pdf_content)
+
+            # ウィンドウ位置が範囲内か確認
+            if window_position < 0 or window_position >= pdf_length - answer_window:
+                print(f"[ERROR] ウィンドウ位置が範囲外: {window_position}")
+                return {'status': 'error', 'reason': 'ウィンドウ位置が範囲外'}
+
+            # ウィンドウテキストを抽出
+            q_start = window_position + (answer_window - question_window) // 2
+            q_end = q_start + question_window
+            question_text = pdf_content[q_start:q_end]
+            a_start = window_position
+            a_end = window_position + answer_window
+            answer_text = pdf_content[a_start:a_end]
+
+            window_info = f"Q範囲: {q_start}~{q_end} / A範囲: {a_start}~{a_end} / 位置: {window_position}"
+            print(f"[DEBUG] {window_info}")
+
+            # 既存のFAQと承認待ちFAQを読み込む
+            existing_questions = [faq['question'] for faq in self.faq_data]
+            self.load_pending_qa()
+            pending_questions = [item['question'] for item in self.pending_qa if 'question' in item]
+            all_existing_questions = existing_questions + pending_questions
+
+            # FAQを生成
+            print(f"[DEBUG] FAQ生成中（位置: {window_position}）...")
+            result = self._generate_qa_from_window(
+                window_text=answer_text,
+                category=category,
+                used_questions=all_existing_questions,
+                window_rejected_questions=[]
+            )
+
+            if not result:
+                print(f"[DEBUG] FAQ生成失敗")
+                return {'status': 'error', 'reason': 'FAQ生成失敗'}
+
+            # pending_qa.csv に追加
+            qa_id = self.add_pending_qa(
+                question=result.get('question', ''),
+                answer=result.get('answer', ''),
+                keywords=result.get('keywords', ''),
+                category=category,
+                user_question=f"[作り直し] 位置: {window_position}",
+                window_info=window_info
+            )
+
+            print(f"[DEBUG] FAQ生成成功: ID={qa_id}")
+            return {
+                'status': 'success',
+                'qa_id': qa_id,
+                'question': result.get('question', ''),
+                'answer': result.get('answer', ''),
+                'window_info': window_info
+            }
+
+        except Exception as e:
+            print(f"[ERROR] generate_faq_for_window エラー: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'status': 'error', 'reason': str(e)}
 
     def _mock_faq_generation(self, num_questions: int, category: str) -> list:
         """Claude API未設定時のモック FAQ 生成"""
@@ -1705,9 +2025,6 @@ JSON配列のみを出力してください：
             print(f"[DEBUG] 追加生成FAQ{len(mock_faqs)}: {additional_faq['question'][:30]}...")
 
         print(f"[DEBUG] 最終生成数: {len(mock_faqs)}")
-        # 生成したFAQを履歴に保存
-        if mock_faqs:
-            self._save_to_generation_history(mock_faqs)
         return mock_faqs
 
 

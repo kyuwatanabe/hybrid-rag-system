@@ -27,7 +27,6 @@ faq_system.claude_api_key = os.getenv('CLAUDE_API_KEY')
 # FAQSystemの作業ディレクトリを明示的に設定
 faq_system.pending_file = os.path.join(faq_system_dir, 'pending_qa.csv')
 faq_system.unsatisfied_qa_file = os.path.join(faq_system_dir, 'unsatisfied_qa.csv')
-faq_system.faq_generation_history_file = os.path.join(faq_system_dir, 'faq_generation_history.csv')
 
 # ハイブリッドRAGシステムを初期化（検索用）
 print("[INFO] ハイブリッドRAGシステムを初期化中...")
@@ -58,6 +57,82 @@ generation_progress = {
     'time_per_faq': 0,  # FAQ1件あたりの平均時間（秒）
     'generated_faqs_list': []  # 生成されたFAQのリスト（質問と位置）
 }
+
+# 自動バックアップ関数
+def create_auto_backup(reason="manual"):
+    """
+    自動バックアップを作成
+    Args:
+        reason: バックアップの理由（例: "approval", "delete", "edit", "manual"）
+    """
+    import zipfile
+    import io
+    import shutil
+    from datetime import datetime
+
+    try:
+        # backupsディレクトリを確認・作成
+        backup_dir = 'backups'
+        if not os.path.exists(backup_dir):
+            os.makedirs(backup_dir)
+
+        # タイムスタンプとバックアップファイル名
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_filename = f'auto_backup_{timestamp}_{reason}.zip'
+        backup_path = os.path.join(backup_dir, backup_filename)
+
+        # ZIPファイルを作成
+        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            # FAQ データを追加
+            if os.path.exists(faq_system.csv_file):
+                zip_file.write(faq_system.csv_file, os.path.basename(faq_system.csv_file))
+
+            # 承認待ちデータを追加
+            if os.path.exists('pending_qa.csv'):
+                zip_file.write('pending_qa.csv', 'pending_qa.csv')
+
+            # 不満足データを追加（あれば）
+            if os.path.exists('unsatisfied_qa.csv'):
+                zip_file.write('unsatisfied_qa.csv', 'unsatisfied_qa.csv')
+
+        print(f"[BACKUP] 自動バックアップ作成: {backup_filename}")
+
+        # 古いバックアップを削除（最新100個だけ保持）
+        cleanup_old_backups(backup_dir, keep_count=100)
+
+        return backup_path
+
+    except Exception as e:
+        print(f"[BACKUP ERROR] バックアップ作成エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+def cleanup_old_backups(backup_dir, keep_count=20):
+    """
+    古いバックアップファイルを削除
+    Args:
+        backup_dir: バックアップディレクトリ
+        keep_count: 保持するバックアップファイル数
+    """
+    try:
+        # バックアップファイル一覧を取得
+        backup_files = [
+            f for f in os.listdir(backup_dir)
+            if f.startswith('auto_backup_') and f.endswith('.zip')
+        ]
+
+        # ファイル作成日時でソート（新しい順）
+        backup_files.sort(key=lambda f: os.path.getmtime(os.path.join(backup_dir, f)), reverse=True)
+
+        # 古いファイルを削除
+        for old_file in backup_files[keep_count:]:
+            old_path = os.path.join(backup_dir, old_file)
+            os.remove(old_path)
+            print(f"[BACKUP] 古いバックアップ削除: {old_file}")
+
+    except Exception as e:
+        print(f"[BACKUP ERROR] バックアップクリーンアップエラー: {e}")
 
 @app.route('/')
 def index():
@@ -106,14 +181,52 @@ def search():
 @app.route('/admin/backup')
 def backup_page():
     """バックアップ管理ページ"""
-    return render_template('backup.html')
+    # バックアップ一覧を取得
+    backup_dir = 'backups'
+    backup_files = []
+
+    try:
+        if os.path.exists(backup_dir):
+            files = [f for f in os.listdir(backup_dir) if f.endswith('.zip')]
+            for filename in files:
+                filepath = os.path.join(backup_dir, filename)
+                file_stat = os.stat(filepath)
+
+                # ファイル名から情報を抽出（例: auto_backup_20250128_133045_approval.zip）
+                parts = filename.replace('.zip', '').split('_')
+                reason = parts[-1] if len(parts) >= 4 else 'unknown'
+
+                # 理由の日本語化
+                reason_map = {
+                    'approval': 'FAQ承認',
+                    'edit': 'FAQ編集',
+                    'delete': 'FAQ削除',
+                    'reject': 'FAQ却下',
+                    'edit_pending': '承認待ち編集',
+                    'manual': '手動バックアップ'
+                }
+                reason_ja = reason_map.get(reason, reason)
+
+                backup_files.append({
+                    'filename': filename,
+                    'size': file_stat.st_size,
+                    'created_at': datetime.datetime.fromtimestamp(file_stat.st_mtime),
+                    'reason': reason_ja
+                })
+
+            # 作成日時で降順ソート（新しい順）
+            backup_files.sort(key=lambda x: x['created_at'], reverse=True)
+    except Exception as e:
+        print(f"[ERROR] バックアップ一覧取得エラー: {e}")
+
+    return render_template('backup.html', backup_files=backup_files)
 
 @app.route('/admin')
 def admin():
     """管理画面"""
     try:
         # 最新データを再読み込み
-        faq_system.load_faq_data('faq_data.csv')
+        faq_system.load_faq_data(faq_system.csv_file)
         faqs = faq_system.faq_data
         print(f"[DEBUG] 管理画面: FAQデータ件数 = {len(faqs)}")
         print(f"[DEBUG] 最初の3件: {[faq.get('question', '')[:30] for faq in faqs[:3]]}")
@@ -139,22 +252,6 @@ def auto_generate_faq_page():
     """FAQ自動生成画面"""
     return render_template('auto_generate_faq.html')
 
-@app.route('/admin/clear_history', methods=['POST'])
-def clear_generation_history():
-    """FAQ生成履歴をクリア（デバッグ用）"""
-    import os
-    history_file = 'faq_generation_history.csv'
-    try:
-        if os.path.exists(history_file):
-            os.remove(history_file)
-            print(f"[DEBUG] FAQ生成履歴を削除: {history_file}")
-            return jsonify({'success': True, 'message': 'FAQ生成履歴を削除しました'})
-        else:
-            return jsonify({'success': True, 'message': '履歴ファイルは存在しません'})
-    except Exception as e:
-        print(f"[ERROR] 履歴削除エラー: {e}")
-        return jsonify({'success': False, 'message': f'エラー: {e}'})
-
 @app.route('/admin/add', methods=['POST'])
 def add_faq():
     """FAQ追加"""
@@ -177,6 +274,8 @@ def edit_faq(index):
 
     if faq_system.edit_faq(index, question if question else None, answer if answer else None, category if category else None):
         faq_system.save_faq_data()
+        # 自動バックアップを作成
+        create_auto_backup(reason="edit")
 
     return redirect(url_for('admin'))
 
@@ -185,6 +284,8 @@ def delete_faq(index):
     """FAQ削除"""
     faq_system.delete_faq(index)
     faq_system.save_faq_data()
+    # 自動バックアップを作成
+    create_auto_backup(reason="delete")
     return redirect(url_for('admin'))
 
 @app.route('/admin/export_all', methods=['GET'])
@@ -203,8 +304,8 @@ def export_all():
 
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
         # FAQ データを追加
-        if os.path.exists('faq_data-1.csv'):
-            zip_file.write('faq_data-1.csv', 'faq_data-1.csv')
+        if os.path.exists(faq_system.csv_file):
+            zip_file.write(faq_system.csv_file, os.path.basename(faq_system.csv_file))
 
         # 承認待ちデータを追加
         if os.path.exists('pending_qa.csv'):
@@ -289,10 +390,14 @@ def import_all():
         # 各CSVファイルを復元
         restored_files = []
 
-        # FAQデータ
-        faq_file = os.path.join(temp_dir, 'faq_data-1.csv')
-        if os.path.exists(faq_file):
-            shutil.copy(faq_file, 'faq_data-1.csv')
+        # FAQデータ（古いファイル名も考慮）
+        faq_file_new = os.path.join(temp_dir, os.path.basename(faq_system.csv_file))
+        faq_file_old = os.path.join(temp_dir, 'faq_data-1.csv')
+        if os.path.exists(faq_file_new):
+            shutil.copy(faq_file_new, faq_system.csv_file)
+            restored_files.append('FAQ')
+        elif os.path.exists(faq_file_old):
+            shutil.copy(faq_file_old, faq_system.csv_file)
             restored_files.append('FAQ')
 
         # 承認待ちデータ
@@ -311,7 +416,7 @@ def import_all():
         shutil.rmtree(temp_dir)
 
         # データを再読み込み
-        faq_system.load_faq_data('faq_data-1.csv')
+        faq_system.load_faq_data(faq_system.csv_file)
         faq_system.load_pending_qa()
 
         restored_str = '、'.join(restored_files)
@@ -321,6 +426,73 @@ def import_all():
 
     except Exception as e:
         print(f"[ERROR] バックアップ復元エラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('backup_page') + '?error=restore_failed')
+
+@app.route('/admin/restore_from_backup/<filename>', methods=['POST'])
+def restore_from_backup(filename):
+    """バックアップディレクトリから直接復元"""
+    import zipfile
+    import shutil
+    import tempfile
+
+    try:
+        backup_path = os.path.join('backups', filename)
+
+        # バックアップファイルの存在確認
+        if not os.path.exists(backup_path):
+            return redirect(url_for('backup_page') + '?error=file_not_found')
+
+        # 一時ディレクトリを作成
+        temp_dir = tempfile.mkdtemp()
+
+        # ZIPファイルを解凍
+        with zipfile.ZipFile(backup_path, 'r') as zip_ref:
+            zip_ref.extractall(temp_dir)
+
+        # 各CSVファイルを復元
+        restored_files = []
+
+        # FAQデータ（古いファイル名も考慮）
+        faq_file_new = os.path.join(temp_dir, os.path.basename(faq_system.csv_file))
+        faq_file_old = os.path.join(temp_dir, 'faq_data-1.csv')
+        if os.path.exists(faq_file_new):
+            shutil.copy(faq_file_new, faq_system.csv_file)
+            restored_files.append('FAQ')
+        elif os.path.exists(faq_file_old):
+            shutil.copy(faq_file_old, faq_system.csv_file)
+            restored_files.append('FAQ')
+
+        # 承認待ちデータ
+        pending_file = os.path.join(temp_dir, 'pending_qa.csv')
+        if os.path.exists(pending_file):
+            shutil.copy(pending_file, 'pending_qa.csv')
+            restored_files.append('承認待ち')
+
+        # 不満足データ
+        unsatisfied_file = os.path.join(temp_dir, 'unsatisfied_qa.csv')
+        if os.path.exists(unsatisfied_file):
+            shutil.copy(unsatisfied_file, 'unsatisfied_qa.csv')
+            restored_files.append('不満足')
+
+        # 一時ファイルを削除
+        shutil.rmtree(temp_dir)
+
+        # データを再読み込み
+        faq_system.load_faq_data(faq_system.csv_file)
+        faq_system.load_pending_qa()
+
+        # ハイブリッドRAGシステムをリロード
+        hybrid_rag.reload_faqs_to_rag()
+
+        restored_str = '、'.join(restored_files)
+        print(f"[BACKUP] バックアップから復元完了: {filename} ({restored_str})")
+
+        return redirect(url_for('backup_page') + f'?success=restore&files={len(restored_files)}')
+
+    except Exception as e:
+        print(f"[BACKUP ERROR] バックアップ復元エラー: {e}")
         import traceback
         traceback.print_exc()
         return redirect(url_for('backup_page') + '?error=restore_failed')
@@ -339,7 +511,7 @@ def batch_delete_faq():
         return redirect(url_for('admin'))
 
     # 最新データを再読み込み
-    faq_system.load_faq_data('faq_data-1.csv')
+    faq_system.load_faq_data(faq_system.csv_file)
 
     # インデックスを降順にソートして削除（大きい方から削除しないとインデックスがずれる）
     indices = sorted([int(idx) for idx in faq_indices], reverse=True)
@@ -362,7 +534,7 @@ def batch_delete_faq():
 
     faq_system.save_faq_data()
     # 削除後に最新データを再読み込み
-    faq_system.load_faq_data('faq_data-1.csv')
+    faq_system.load_faq_data(faq_system.csv_file)
     print(f"[DEBUG] 削除後のFAQ件数: {len(faq_system.faq_data)}")
     print(f"[DEBUG] まとめて削除完了 - 成功: {success_count}件")
     return redirect(url_for('admin'))
@@ -387,6 +559,9 @@ def approve_qa(qa_id):
     if faq_system.approve_pending_qa(qa_id):
         faq_system.save_faq_data()
         print(f"[DEBUG] Q&A承認成功: {qa_id}")
+
+        # 自動バックアップを作成
+        create_auto_backup(reason="approval")
 
         # faq_database.csvを更新（検索用）
         import csv
@@ -437,9 +612,249 @@ def reject_qa(qa_id):
     """Q&Aを却下"""
     if faq_system.reject_pending_qa(qa_id):
         print(f"[DEBUG] Q&A却下成功: {qa_id}")
+        # 自動バックアップを作成
+        create_auto_backup(reason="reject")
     else:
         print(f"[DEBUG] Q&A却下失敗: {qa_id}")
     return redirect(url_for('review_pending'))
+
+@app.route('/admin/mark_question_ng/<qa_id>', methods=['POST'])
+def mark_question_ng(qa_id):
+    """質問をNG登録（不適切な質問として学習、FAQは残す）"""
+    import re
+    from datetime import datetime
+
+    try:
+        # 承認待ちQ&Aを取得
+        faq_system.load_pending_qa()
+        pending_item = None
+        for item in faq_system.pending_qa:
+            if item['id'] == qa_id:
+                pending_item = item
+                break
+
+        if not pending_item:
+            print(f"[DEBUG] 質問NG登録失敗: アイテムが見つかりません - {qa_id}")
+            return redirect(url_for('review_pending'))
+
+        # window_info から位置を抽出
+        window_info = pending_item.get('window_info', '')
+        window_position = None
+        if window_info:
+            match = re.search(r'位置:\s*(\d+)', window_info)
+            if match:
+                window_position = int(match.group(1))
+
+        print(f"[DEBUG] 質問NG登録 - ID: {qa_id}")
+        print(f"[DEBUG] NG質問: {pending_item['question']}")
+
+        # rejected_patterns.csv に記録（type=question）
+        rejected_file = 'rejected_patterns.csv'
+        import csv
+        with open(rejected_file, 'a', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                pending_item.get('question', ''),
+                pending_item.get('answer', ''),
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                window_position if window_position else '',
+                '',  # chunk_textは空
+                'question'  # type
+            ])
+        print(f"[DEBUG] rejected_patterns.csv に記録しました（type=question）")
+
+        # バックアップ作成（FAQは削除しない）
+        create_auto_backup(reason="mark_question_ng")
+
+        return redirect(url_for('review_pending'))
+
+    except Exception as e:
+        print(f"[ERROR] 質問NG登録処理でエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('review_pending'))
+
+@app.route('/admin/mark_answer_ng/<qa_id>', methods=['POST'])
+def mark_answer_ng(qa_id):
+    """回答をNG登録（不適切な回答として学習、FAQは残す）"""
+    import re
+    from datetime import datetime
+
+    try:
+        # 承認待ちQ&Aを取得
+        faq_system.load_pending_qa()
+        pending_item = None
+        for item in faq_system.pending_qa:
+            if item['id'] == qa_id:
+                pending_item = item
+                break
+
+        if not pending_item:
+            print(f"[DEBUG] 回答NG登録失敗: アイテムが見つかりません - {qa_id}")
+            return redirect(url_for('review_pending'))
+
+        # window_info から位置を抽出
+        window_info = pending_item.get('window_info', '')
+        window_position = None
+        if window_info:
+            match = re.search(r'位置:\s*(\d+)', window_info)
+            if match:
+                window_position = int(match.group(1))
+
+        print(f"[DEBUG] 回答NG登録 - ID: {qa_id}")
+        print(f"[DEBUG] 質問: {pending_item['question']}")
+        print(f"[DEBUG] NG回答: {pending_item['answer'][:50]}...")
+
+        # rejected_patterns.csv に記録（type=answer）
+        rejected_file = 'rejected_patterns.csv'
+        import csv
+        with open(rejected_file, 'a', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                pending_item.get('question', ''),
+                pending_item.get('answer', ''),
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                window_position if window_position else '',
+                '',  # chunk_textは空
+                'answer'  # type
+            ])
+        print(f"[DEBUG] rejected_patterns.csv に記録しました（type=answer）")
+
+        # バックアップ作成（FAQは削除しない）
+        create_auto_backup(reason="mark_answer_ng")
+
+        return redirect(url_for('review_pending'))
+
+    except Exception as e:
+        print(f"[ERROR] 回答NG登録処理でエラー: {e}")
+        import traceback
+        traceback.print_exc()
+        return redirect(url_for('review_pending'))
+
+@app.route('/admin/rejected_patterns')
+def rejected_patterns_page():
+    """NGデータ管理画面"""
+    import csv
+    import os
+
+    rejected_patterns = []
+    rejected_file = 'rejected_patterns.csv'
+
+    try:
+        if os.path.exists(rejected_file):
+            with open(rejected_file, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    rejected_patterns.append(row)
+    except Exception as e:
+        print(f"[ERROR] rejected_patterns.csv 読み込みエラー: {e}")
+
+    # 新しい順にソート
+    rejected_patterns.reverse()
+
+    return render_template('rejected_patterns.html', rejected_patterns=rejected_patterns)
+
+@app.route('/admin/delete_rejected_pattern/<int:index>', methods=['POST'])
+def delete_rejected_pattern(index):
+    """NGパターンを削除"""
+    import csv
+    import os
+
+    rejected_file = 'rejected_patterns.csv'
+
+    try:
+        # 全データを読み込み
+        all_patterns = []
+        if os.path.exists(rejected_file):
+            with open(rejected_file, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                all_patterns = list(reader)
+
+        # 指定されたインデックスを削除（逆順で表示しているので調整）
+        actual_index = len(all_patterns) - 1 - index
+        if 0 <= actual_index < len(all_patterns):
+            deleted_item = all_patterns.pop(actual_index)
+            print(f"[DEBUG] NGパターン削除: {deleted_item.get('question', '')[:30]}...")
+
+            # ファイルに書き戻し
+            with open(rejected_file, 'w', encoding='utf-8', newline='') as f:
+                if all_patterns:
+                    fieldnames = ['question', 'answer', 'rejected_at', 'window_position', 'chunk_text', 'type']
+                    writer = csv.DictWriter(f, fieldnames=fieldnames)
+                    writer.writeheader()
+                    writer.writerows(all_patterns)
+                else:
+                    # 空の場合はヘッダーのみ
+                    f.write('question,answer,rejected_at,window_position,chunk_text,type\n')
+
+            create_auto_backup(reason="delete_rejected_pattern")
+    except Exception as e:
+        print(f"[ERROR] NGパターン削除エラー: {e}")
+        import traceback
+        traceback.print_exc()
+
+    return redirect(url_for('rejected_patterns_page'))
+
+@app.route('/admin/batch_delete_rejected_patterns', methods=['POST'])
+def batch_delete_rejected_patterns():
+    """複数のNGパターンをまとめて削除"""
+    import csv
+    import os
+
+    ng_indices = request.form.getlist('ng_indices')
+    rejected_file = 'rejected_patterns.csv'
+
+    try:
+        if not ng_indices:
+            print("[DEBUG] まとめて削除: 選択されたNGパターンがありません")
+            return redirect(url_for('rejected_patterns_page'))
+
+        # 全データを読み込み
+        all_patterns = []
+        if os.path.exists(rejected_file):
+            with open(rejected_file, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                all_patterns = list(reader)
+
+        # インデックスを降順にソートして削除（大きい方から削除しないとインデックスがずれる）
+        indices = sorted([int(idx) for idx in ng_indices], reverse=True)
+
+        # 逆順で表示しているので実際のインデックスを計算
+        actual_indices = [len(all_patterns) - 1 - idx for idx in indices]
+        actual_indices.sort(reverse=True)
+
+        print(f"[DEBUG] まとめて削除開始 - 対象インデックス: {actual_indices}")
+        print(f"[DEBUG] 削除前のNGパターン数: {len(all_patterns)}")
+
+        success_count = 0
+        for idx in actual_indices:
+            if 0 <= idx < len(all_patterns):
+                deleted_item = all_patterns.pop(idx)
+                success_count += 1
+                print(f"[DEBUG] NGパターン削除: {deleted_item.get('question', '')[:30]}...")
+
+        # ファイルに書き戻し
+        with open(rejected_file, 'w', encoding='utf-8', newline='') as f:
+            if all_patterns:
+                fieldnames = ['question', 'answer', 'rejected_at', 'window_position', 'chunk_text', 'type']
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(all_patterns)
+            else:
+                # 空の場合はヘッダーのみ
+                f.write('question,answer,rejected_at,window_position,chunk_text,type\n')
+
+        print(f"[DEBUG] 削除後のNGパターン数: {len(all_patterns)}")
+        print(f"[DEBUG] まとめて削除完了 - 成功: {success_count}件")
+
+        create_auto_backup(reason="batch_delete_rejected_patterns")
+
+    except Exception as e:
+        print(f"[ERROR] NGパターン一括削除エラー: {e}")
+        import traceback
+        traceback.print_exc()
+
+    return redirect(url_for('rejected_patterns_page'))
 
 @app.route('/admin/batch_reject', methods=['POST'])
 def batch_reject_qa():
@@ -474,6 +889,8 @@ def edit_pending_qa(qa_id):
 
     if faq_system.edit_pending_qa(qa_id, question, answer, keywords, category):
         print(f"[DEBUG] 承認待ちQ&A編集成功: {qa_id}")
+        # 自動バックアップを作成
+        create_auto_backup(reason="edit_pending")
     else:
         print(f"[DEBUG] 承認待ちQ&A編集失敗: {qa_id}")
 
@@ -506,7 +923,7 @@ def check_duplicates(qa_id):
             return redirect(url_for('review_pending'))
 
         # 類似FAQ検索
-        faq_system.load_faq_data('faq_data-1.csv')
+        faq_system.load_faq_data(faq_system.csv_file)
         similar_faqs = find_similar_faqs(faq_system, pending_item['question'])
 
         print(f"[DEBUG] 重複チェック - 質問: {pending_item['question']}")
@@ -607,6 +1024,7 @@ def auto_generate_faqs():
             generation_progress['excluded_windows'] = 0
             generation_progress['total_windows'] = 0
             generation_progress['positions_list'] = []  # 成功した位置のリスト
+            generation_progress['rejected_positions'] = []  # 拒否された位置のリスト（赤字表示用）
             generation_progress['current_trying_position'] = ''  # 現在試行中の位置
             generation_progress['start_time'] = time.time()  # 生成開始時刻を記録
             generation_progress['last_update_time'] = time.time()
@@ -620,7 +1038,7 @@ def auto_generate_faqs():
             faq_system.generation_interrupted = False
 
             # 進捗更新用コールバックを設定
-            def update_progress(current, total, retry_count=0, excluded_windows=0, total_windows=0, question_range='', answer_range='', current_position=''):
+            def update_progress(current, total, retry_count=0, excluded_windows=0, total_windows=0, question_range='', answer_range='', current_position='', rejected_position=''):
                 current_time = time.time()
                 generation_progress['current'] = current
                 generation_progress['total'] = total
@@ -635,6 +1053,10 @@ def auto_generate_faqs():
                 # FAQ生成成功時（retry_count == 0）のみ位置をリストに追加
                 if retry_count == 0 and current_position and current_position not in generation_progress['positions_list']:
                     generation_progress['positions_list'].append(current_position)
+
+                # 拒否された位置を記録（赤字表示用）
+                if rejected_position and rejected_position not in generation_progress['rejected_positions']:
+                    generation_progress['rejected_positions'].append(rejected_position)
 
                 generation_progress['last_update_time'] = current_time
 
@@ -811,7 +1233,7 @@ def auto_generate_faqs():
             faq_system.generation_interrupted = False
 
             # 進捗更新用コールバックを設定
-            def update_progress(current, total, retry_count=0, excluded_windows=0, total_windows=0, question_range='', answer_range='', current_position=''):
+            def update_progress(current, total, retry_count=0, excluded_windows=0, total_windows=0, question_range='', answer_range='', current_position='', rejected_position=''):
                 current_time = time.time()
                 generation_progress['current'] = current
                 generation_progress['total'] = total
@@ -826,6 +1248,10 @@ def auto_generate_faqs():
                 # FAQ生成成功時（retry_count == 0）のみ位置をリストに追加
                 if retry_count == 0 and current_position and current_position not in generation_progress['positions_list']:
                     generation_progress['positions_list'].append(current_position)
+
+                # 拒否された位置を記録（赤字表示用）
+                if rejected_position and rejected_position not in generation_progress['rejected_positions']:
+                    generation_progress['rejected_positions'].append(rejected_position)
 
                 generation_progress['last_update_time'] = current_time
 

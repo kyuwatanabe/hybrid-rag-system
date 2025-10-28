@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GFアメリカビザサポートデスク - 管理画面</title>
+    <!-- Version: 2.0.20251028 - 編集フォーム修正 -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <style>
         * {
             margin: 0;
@@ -499,6 +503,7 @@
                 <a href="/admin/review" class="back-link" style="margin-right: 10px;">承認待ちFAQ</a>
                 <a href="/admin/add_faq" class="back-link" style="margin-right: 10px;">FAQ追加</a>
                 <a href="/admin/auto_generate_faq" class="back-link" style="margin-right: 10px;">FAQ自動生成</a>
+                <a href="/admin/rejected_patterns" class="back-link" style="margin-right: 10px;">NGデータ管理</a>
                 <a href="/admin/backup" class="back-link" style="margin-right: 10px;">バックアップ</a>
                 <a href="/" class="back-link">ユーザー画面に戻る</a>
             </div>
@@ -528,11 +533,10 @@
                     </button>
                 </div>
 
-                <form id="batch-delete-form" method="POST" action="/admin/batch_delete">
                 {% for faq in faqs %}
                 <div class="faq-item">
                     <div class="faq-checkbox">
-                        <input type="checkbox" name="faq_indices" value="{{ loop.index0 }}" class="faq-select">
+                        <input type="checkbox" data-index="{{ loop.index0 }}" class="faq-select">
                     </div>
                     <div class="faq-header">
                         <div class="faq-number">{{ loop.index }}</div>
@@ -546,30 +550,26 @@
                         <div class="faq-answer">{{ faq.answer }}</div>
                         <div class="faq-category">カテゴリ: <span class="category-badge">{{ faq.get('category', '一般') }}</span></div>
                     </div>
-                </div>
-                {% endfor %}
-                </form>
-
-                <!-- 編集フォーム（全FAQ共通・バッチ削除フォームの外） -->
-                {% for faq in faqs %}
-                <div class="edit-form" id="edit-form-{{ loop.index0 }}">
-                    <h3>FAQ編集</h3>
-                    <form action="/admin/edit/{{ loop.index0 }}" method="post">
-                        <div class="form-group">
-                            <label>質問:</label>
-                            <input type="text" name="question" value="{{ faq.question }}" maxlength="200">
-                        </div>
-                        <div class="form-group">
-                            <label>回答:</label>
-                            <textarea name="answer" maxlength="1000">{{ faq.answer }}</textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>カテゴリ:</label>
-                            <input type="text" name="category" value="{{ faq.get('category', '一般') }}" maxlength="50" placeholder="例: ビザ基本, 就労ビザ, 学生ビザ">
-                        </div>
-                        <button type="submit" class="btn">更新</button>
-                        <button type="button" class="btn" onclick="toggleEdit({{ loop.index0 }})">キャンセル</button>
-                    </form>
+                    <!-- 編集フォーム（各FAQアイテム内・独立したフォーム） -->
+                    <div class="edit-form" id="edit-form-{{ loop.index0 }}">
+                        <h3>FAQ編集</h3>
+                        <form action="/admin/edit/{{ loop.index0 }}" method="post">
+                            <div class="form-group">
+                                <label>質問:</label>
+                                <input type="text" name="question" value="{{ faq.question }}" maxlength="200">
+                            </div>
+                            <div class="form-group">
+                                <label>回答:</label>
+                                <textarea name="answer" maxlength="1000">{{ faq.answer }}</textarea>
+                            </div>
+                            <div class="form-group">
+                                <label>カテゴリ:</label>
+                                <input type="text" name="category" value="{{ faq.get('category', '一般') }}" maxlength="50" placeholder="例: ビザ基本, 就労ビザ, 学生ビザ">
+                            </div>
+                            <button type="submit" class="btn">更新</button>
+                            <button type="button" class="btn" onclick="toggleEdit({{ loop.index0 }})">キャンセル</button>
+                        </form>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
@@ -577,12 +577,24 @@
     </div>
 
     <script>
+        // Version: 2.0 - 編集フォーム修正
         function toggleEdit(index) {
+            console.log('toggleEdit called with index:', index);
             const editForm = document.getElementById(`edit-form-${index}`);
+            console.log('editForm element:', editForm);
+            console.log('Current display:', editForm ? editForm.style.display : 'NOT FOUND');
+
+            if (!editForm) {
+                alert('編集フォームが見つかりません。ページをリフレッシュしてください。');
+                return;
+            }
+
             if (editForm.style.display === 'none' || editForm.style.display === '') {
                 editForm.style.display = 'block';
+                console.log('Opened edit form');
             } else {
                 editForm.style.display = 'none';
+                console.log('Closed edit form');
             }
         }
 
@@ -653,7 +665,22 @@
             }
 
             if (confirm(`選択した${count}件のFAQを削除してもよろしいですか？\n\nこの操作は取り消せません。`)) {
-                document.getElementById('batch-delete-form').submit();
+                // 動的にフォームを作成
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/batch_delete';
+
+                // チェックされた各アイテムのインデックスを追加
+                checkedBoxes.forEach(checkbox => {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = 'faq_indices';
+                    input.value = checkbox.dataset.index;
+                    form.appendChild(input);
+                });
+
+                document.body.appendChild(form);
+                form.submit();
             }
         }
 

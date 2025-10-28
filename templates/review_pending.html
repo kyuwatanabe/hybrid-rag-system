@@ -521,9 +521,6 @@
 
                         <div class="qa-meta">
                             <span>カテゴリ: {{ item.category }}</span>
-                            {% if item.window_info %}
-                            <span style="color: #666; font-size: 0.9em;">📍 ウィンドウ: {{ item.window_info }}</span>
-                            {% endif %}
                             {% if item.keywords %}
                             <span>キーワード: {{ item.keywords }}</span>
                             {% endif %}
@@ -533,6 +530,12 @@
                             <a href="/admin/check_duplicates/{{ item.id }}" class="btn btn-check">
                                 🔍 重複チェック
                             </a>
+                            <button type="button" class="btn" style="background: #ff9800; color: white;" onclick="markQuestionAsNG('{{ item.id }}')">
+                                🚫 質問をNG登録
+                            </button>
+                            <button type="button" class="btn" style="background: #2196F3; color: white;" onclick="markAnswerAsNG('{{ item.id }}')">
+                                🚫 回答をNG登録
+                            </button>
                             <button type="button" class="btn btn-reject" onclick="rejectSingle('{{ item.id }}')">
                                 ❌ 却下
                             </button>
@@ -630,6 +633,28 @@
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = '/admin/reject/' + qaId;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // 質問をNG登録
+        function markQuestionAsNG(qaId) {
+            if (confirm('この質問をNG登録しますか？\n\n【動作】\n・不適切な質問として記録され、今後同様の質問は生成されなくなります\n・このFAQは承認待ちリストに残ります（削除されません）')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/mark_question_ng/' + qaId;
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+
+        // 回答をNG登録
+        function markAnswerAsNG(qaId) {
+            if (confirm('この回答をNG登録しますか？\n\n【動作】\n・不適切な回答として記録され、今後同様の回答は生成されなくなります\n・このFAQは承認待ちリストに残ります（削除されません）')) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/admin/mark_answer_ng/' + qaId;
                 document.body.appendChild(form);
                 form.submit();
             }
